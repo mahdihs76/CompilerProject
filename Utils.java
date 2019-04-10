@@ -7,11 +7,11 @@ public class Utils {
 
     public static HashMap<String, TokenType> getKeywords(){
         HashMap<String, TokenType> keywords = new HashMap<>();
-        keywords.put("if", TokenType.IF);
+        /*keywords.put("if", TokenType.IF);
         keywords.put("then", TokenType.THEN);
         keywords.put("else", TokenType.ELSE);
         keywords.put("while", TokenType.WHILE);
         keywords.put("do", TokenType.DO);
-        return keywords;
+        */return keywords;
     }
 }

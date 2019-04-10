@@ -1,6 +1,8 @@
 import org.junit.Test;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * Created by mahdihs76 on 4/3/19.
@@ -10,37 +12,50 @@ public class TokenizerTest {
 
     @Test
     public void test1(){
-        ArrayList<Token> tokens = Tokenizer.process("a = 2;" +
-                "b <= 3;" +
-                "if (a == b) {" +
-                "}");
-
-        for (Token token : tokens) {
-            System.out.println(token);
-        }
+        Tokenizer.get_next_token("");
     }
 
     @Test
     public void test2(){
-        ArrayList<Token> tokens = Tokenizer.process("int a = 0;" +
-                "// comment2" +
-                "a = 2 + +2;" +
-                "a = a + -3;" +
-                "cde = a;" +
-                "if (b /* comment1 */ == 3) {" +
-                "a = 3;" +
-                "cd!e = -7;" +
-                "}" +
-                "else" +
-                "{" +
-                "b = a < cde;" +
-                "{cde = @2;" +
-                "}}" +
-                "return;" +
-                "}");
+        Map map = Tokenizer.get_next_token("\n\nvoid main(void){\n" +
+                "\tint a = 0;\n" +
+                "\t// comment2\n" +
+                "\ta = 2 + +2;\n" +
+                "\ta = a + -3;\n" +
+                "\tcde = a;\n" +
+                "\tif (b /* comment1 */ == 3) {\n" +
+                "\ta = 3;\n" +
+                "\tcd!e = -7;\n" +
+                "\t}\n" +
+                "\telse\n" +
+                "\t{\n" +
+                "\tb = a < cde;\n" +
+                "\t{cde = @2;\n" +
+                "\t}}\n" +
+                "\treturn;\n" +
+                "}\n");
 
-        for (Token token : tokens) {
-            System.out.println(token);
+        ArrayList<Token> result = (ArrayList<Token>)(map.get("result"));
+        ArrayList<Token> lexical_errors = (ArrayList<Token>)(map.get("lexical_errors"));
+
+        int line = 0;
+        for (Token token : result) {
+            if (token.getType().getGroup().equals("WHITESPACE"))
+                continue;
+            if (token.getLine() > line) {
+                line = token.getLine();
+                System.out.print("\n" + token.getLine() + ". ");
+            }
+            System.out.print(token + " ");
+        }
+        System.out.println();
+        line = 0;
+        for (Token token : lexical_errors) {
+            if (token.getLine() > line) {
+                line = token.getLine();
+                System.out.print("\n" + token.getLine() + ". ");
+            }
+            System.out.print(token + " ");
         }
     }
 

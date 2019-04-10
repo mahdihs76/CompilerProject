@@ -5,9 +5,19 @@ public class Token {
     private TokenType type;
     private String text;
 
+    private int line;
+    private int col;
+
     public Token(TokenType type, String text) {
         this.type = type;
         this.text = text;
+    }
+
+    public Token(TokenType type, String text, int line, int col) {
+        this.type = type;
+        this.text = text;
+        this.line = line;
+        this.col = col;
     }
 
     @Override
@@ -30,6 +40,13 @@ public class Token {
 
     @Override
     public String toString() {
-        return "(" + type.toString() + ", " + text +")";
+        if(type.equals(TokenType.INVALID_INPUT))
+            return "(" + text + ", " + type.getGroup() + ")";
+        else
+            return "(" + type.getGroup() + ", " + text + ")";
     }
+
+    public int getLine() { return line; }
+    public int getCol() { return col; }
+
 }
