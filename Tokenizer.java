@@ -27,8 +27,12 @@ public class Tokenizer {
     public static Map<String, ArrayList<Token>> get_next_token(String input) {
         // reading from the file "input.txt":
         try {
-            BufferedReader br = new BufferedReader(new FileReader("input.txt"));
-            try {
+            File file = new File("input.txt");
+            if (file.createNewFile()) {
+                System.out.println("File " + file.getName() + " just created. Please try again.");
+            } else {
+                //System.out.println("file already exists");
+                BufferedReader br = new BufferedReader(new FileReader(file));
                 StringBuilder sb = new StringBuilder();
                 String line = br.readLine();
 
@@ -40,13 +44,9 @@ public class Tokenizer {
 
                 input = sb.toString();
                 br.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                try {br.close();} catch (Exception ex) {/*ignore*/}
             }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+            System.err.println("error occurred!");
         }
 
         //tokenizing:
@@ -57,34 +57,46 @@ public class Tokenizer {
         StringBuilder result_sb = new StringBuilder();
         StringBuilder lexical_errors_sb = new StringBuilder();
         int line = 0;
+        boolean isFirstTime = true;
         for (Token token : tokenizer.result) {
             if (token.getType().getGroup().equals("WHITESPACE"))
                 continue;
             if (token.getLine() > line) {
                 line = token.getLine();
-                result_sb.append("\n" + token.getLine() + ". ");
+                if(isFirstTime)
+                    result_sb.append(token.getLine() + ". ");
+                else
+                    result_sb.append("\n" + token.getLine() + ". ");
             }
             result_sb.append(token + " ");
+            isFirstTime = false;
         }
         line = 0;
+        isFirstTime = true;
         for (Token token : tokenizer.lexical_errors) {
             if (token.getLine() > line) {
                 line = token.getLine();
-                lexical_errors_sb.append("\n" + token.getLine() + ". ");
+                if(isFirstTime)
+                    lexical_errors_sb.append(token.getLine() + ". ");
+                else
+                    lexical_errors_sb.append("\n" + token.getLine() + ". ");
             }
             lexical_errors_sb.append(token + " ");
+            isFirstTime = false;
         }
 
         //writing in files "scanner.txt" and "lexical_errors.txt":
-        BufferedWriter bw = null;
         try {
-            bw = new BufferedWriter(new OutputStreamWriter(
+            BufferedWriter bw1 = new BufferedWriter(new OutputStreamWriter(
                     new FileOutputStream("scanner.txt")));
-            bw.write("Something");
+            bw1.write(result_sb.toString());
+            bw1.close();
+            BufferedWriter bw2 = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream("lexical_errors.txt")));
+            bw2.write(lexical_errors_sb.toString());
+            bw2.close();
         } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            try {bw.close();} catch (Exception ex) {/*ignore*/}
+            System.err.println("error occurred!");
         }
 
         //returing result and lexical_errors:
@@ -97,10 +109,9 @@ public class Tokenizer {
     private void tokenize() {
         skipWhitespace();
         while (!input.isEmpty()) {
-            boolean ok = tryManyTokens(true, 0) ||
-                    //tryRegex(boolPattern, TokenType.BOOL_CONST, true) ||
-                    tryRegex(intPattern, TokenType.INT_CONST, true) ||
-                    tryRegex(identifierPattern, TokenType.ID, true);
+            boolean ok = tryRegex(identifierPattern, TokenType.ID, true) ||
+                    tryManyTokens(true, 0) ||
+                    tryRegex(intPattern, TokenType.INT_CONST, true);
             handleComment();
 
             if (!ok && isInvalidCharacter(0)) {
@@ -117,11 +128,11 @@ public class Tokenizer {
         if (input.substring(start).startsWith(text)) {
             if (!addToken) return true;
             else {
-                boolean thereIsError = checkInvalidity(text);
-                if (!thereIsError) {
+//                boolean thereIsError = checkInvalidity(text);
+//                if (!thereIsError) {
                     result.add(new Token(type, text, line, col));
                     consumeInput(text.length());
-                }
+//                }
                 return true;
             }
         } else {
@@ -132,6 +143,15 @@ public class Tokenizer {
     private boolean tryRegex(Pattern p, TokenType type, boolean addToken) {
         Matcher m = p.matcher(input);
         if (m.lookingAt()) {
+
+            //checking if it is not a keyword:
+            for (TokenType tokenType: TokenType.values()) {
+                if(tokenType.getGroup().equals("KEYWORD") &&
+                        m.group().equals(tokenType.getText())) {
+                    return false;
+                }
+            }
+
             boolean thereIsError = checkInvalidity(m.group());
             if (!thereIsError && addToken) {
                 result.add(new Token(type, m.group(), line, col));
