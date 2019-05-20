@@ -1,3 +1,5 @@
+package utility;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -6,7 +8,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Paths;
 
-public class A {
+public class FileHelper {
     public static void main(String[] args) {
         try {
             File file = new File("input.txt");

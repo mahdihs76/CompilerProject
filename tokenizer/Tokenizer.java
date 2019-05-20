@@ -1,3 +1,5 @@
+package tokenizer;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -15,6 +17,10 @@ public class Tokenizer {
     private String input;
     private int line;
     private int col;
+
+    public ArrayList<Token> getResult() {
+        return result;
+    }
 
     public Tokenizer(String input) {
         this.result = new ArrayList<>();
@@ -106,12 +112,12 @@ public class Tokenizer {
         return map;
     }
 
-    private void tokenize() {
+    public void tokenize() {
         skipWhitespace();
         while (!input.isEmpty()) {
-            boolean ok = tryRegex(identifierPattern, TokenType.ID, true) ||
+            boolean ok = tryRegex(identifierPattern, Token.Type.ID, true) ||
                     tryManyTokens(true, 0) ||
-                    tryRegex(intPattern, TokenType.INT_CONST, true);
+                    tryRegex(intPattern, Token.Type.INT_CONST, true);
             handleComment();
 
             if (!ok && isInvalidCharacter(0)) {
@@ -123,7 +129,7 @@ public class Tokenizer {
         }
     }
 
-    private boolean tryToken(TokenType type, boolean addToken, int start) {
+    private boolean tryToken(Token.Type type, boolean addToken, int start) {
         String text = type.getText();
         if (input.substring(start).startsWith(text)) {
             if (!addToken) return true;
@@ -140,12 +146,12 @@ public class Tokenizer {
         }
     }
 
-    private boolean tryRegex(Pattern p, TokenType type, boolean addToken) {
+    private boolean tryRegex(Pattern p, Token.Type type, boolean addToken) {
         Matcher m = p.matcher(input);
         if (m.lookingAt()) {
 
             //checking if it is not a keyword:
-            for (TokenType tokenType: TokenType.values()) {
+            for (Token.Type tokenType: Token.Type.values()) {
                 if(tokenType.getGroup().equals("KEYWORD") &&
                         m.group().equals(tokenType.getText())) {
                     return false;
@@ -165,11 +171,11 @@ public class Tokenizer {
     }
 
 //    private boolean tryKeywordOrIdentifier() {
-//        if (tryRegex(identifierPattern, TokenType.ID, true)) {
-//            /*Token tok = result.get(result.size() - 1);
-//            TokenType kwType = Utils.getKeywords().get(tok.getText());
+//        if (tryRegex(identifierPattern, tokenizer.Token.parser.models.Type.ID, true)) {
+//            /*tokenizer.Token tok = result.get(result.size() - 1);
+//            parser.models.Type kwType = utility.MyUtils.getKeywords().get(tok.getText());
 //            if (kwType != null) {
-//                tok = new Token(kwType, tok.getText(), line, col);
+//                tok = new tokenizer.Token(kwType, tok.getText(), line, col);
 //                result.set(result.size() - 1, tok);
 //            }*/
 //            return true;
@@ -203,10 +209,10 @@ public class Tokenizer {
 
     private boolean tryManyTokens(boolean addToken, int start) {
         boolean output = false;
-        for (TokenType tokenType: TokenType.values()) {
-            String group = tokenType.getGroup();
+        for (Token.Type type : Token.Type.values()) {
+            String group = type.getGroup();
             if (group.equals("KEYWORD") || group.equals("SYMBOL")) {
-                output = output || tryToken(tokenType, addToken, start);
+                output = output || tryToken(type, addToken, start);
             }
         }
         return output;
@@ -215,21 +221,21 @@ public class Tokenizer {
     private void handleComment() {
         boolean output = false;
         int i = 0;
-        if (tryToken(TokenType.OPEN_COMMENT, false, i)) {
-            i += TokenType.OPEN_COMMENT.getText().length();
+        if (tryToken(Token.Type.OPEN_COMMENT, false, i)) {
+            i += Token.Type.OPEN_COMMENT.getText().length();
             while (i <= input.length() - 1) {
-                if (tryToken(TokenType.CLOSE_COMMENT, false, i++))
+                if (tryToken(Token.Type.CLOSE_COMMENT, false, i++))
                     break;
             }
-            consumeInput(i + TokenType.CLOSE_COMMENT.getText().length());
+            consumeInput(i + Token.Type.CLOSE_COMMENT.getText().length());
         }
-        if (tryToken(TokenType.SINGLE_LINE_COMMENT, false, i)) {
-            i += TokenType.SINGLE_LINE_COMMENT.getText().length();
+        if (tryToken(Token.Type.SINGLE_LINE_COMMENT, false, i)) {
+            i += Token.Type.SINGLE_LINE_COMMENT.getText().length();
             while (i <= input.length() - 1) {
-                if (tryToken(TokenType.NEWLINE, false, i++))
+                if (tryToken(Token.Type.NEWLINE, false, i++))
                     break;
             }
-            consumeInput(i + TokenType.NEWLINE.getText().length());
+            consumeInput(i + Token.Type.NEWLINE.getText().length());
         }
     }
 
@@ -252,7 +258,7 @@ public class Tokenizer {
         }
 
         if (thereIsError) {
-            lexical_errors.add(new Token(TokenType.INVALID_INPUT, invalid_token.toString(), line, col));
+            lexical_errors.add(new Token(Token.Type.INVALID_INPUT, invalid_token.toString(), line, col));
             consumeInput(invalid_token.length());
         }
 
