@@ -57,7 +57,7 @@ public class Tokenizer {
 
         //tokenizing:
         Tokenizer tokenizer = new Tokenizer(input);
-        tokenizer.tokenize();
+        tokenizer.get_next_token();
 
         //making output strings ready to be written in files:
         StringBuilder result_sb = new StringBuilder();
@@ -112,22 +112,45 @@ public class Tokenizer {
         return map;
     }
 
-    public void tokenize() {
+
+
+
+
+    public Token get_next_token() {
         skipWhitespace();
-        while (!input.isEmpty()) {
+        int initialResultSize = result.size();
+
+        while(true) {
+            if (input.isEmpty())
+                return null;
+
             boolean ok = tryRegex(identifierPattern, Token.Type.ID, true) ||
                     tryManyTokens(true, 0) ||
                     tryRegex(intPattern, Token.Type.INT_CONST, true);
             handleComment();
 
+
             if (!ok && isInvalidCharacter(0)) {
-                boolean thereIsError = checkInvalidity("");
-                if (!thereIsError) continue;
+                checkInvalidity("");
+            }
+            //boolean thereIsError = checkInvalidity("");
+            //if (!thereIsError) continue;
+            skipWhitespace();
+
+            int newResultSize = result.size();
+            if (newResultSize > initialResultSize) {
+                //System.err.println(newResultSize - initialResultSize);
+                return result.get(result.size() - 1);
             }
 
-            skipWhitespace();
+
         }
     }
+
+
+
+
+
 
     private boolean tryToken(Token.Type type, boolean addToken, int start) {
         String text = type.getText();
@@ -218,7 +241,7 @@ public class Tokenizer {
         return output;
     }
 
-    private void handleComment() {
+    private boolean handleComment() {
         boolean output = false;
         int i = 0;
         if (tryToken(Token.Type.OPEN_COMMENT, false, i)) {
@@ -227,16 +250,21 @@ public class Tokenizer {
                 if (tryToken(Token.Type.CLOSE_COMMENT, false, i++))
                     break;
             }
-            consumeInput(i + Token.Type.CLOSE_COMMENT.getText().length());
+            consumeInput(i - 1 + Token.Type.CLOSE_COMMENT.getText().length());
+            output = true;
         }
+        i = 0;
         if (tryToken(Token.Type.SINGLE_LINE_COMMENT, false, i)) {
             i += Token.Type.SINGLE_LINE_COMMENT.getText().length();
             while (i <= input.length() - 1) {
                 if (tryToken(Token.Type.NEWLINE, false, i++))
                     break;
             }
-            consumeInput(i + Token.Type.NEWLINE.getText().length());
+            consumeInput(i - 1 + Token.Type.NEWLINE.getText().length());
+            output = true;
         }
+
+        return output;
     }
 
     private boolean isInvalidCharacter(int i) {
