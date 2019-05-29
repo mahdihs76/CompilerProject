@@ -5,6 +5,7 @@ import java.util.ArrayList;
 public class Node {
     private String label;
     private ArrayList<Node> childrens;
+    private int depth = 0;
 
     public Node(String label) {
         this.label = label;
@@ -21,5 +22,13 @@ public class Node {
 
     public ArrayList<Node> getChildrens() {
         return childrens;
+    }
+
+    public int getDepth() {
+        return depth;
+    }
+
+    public void setDepth(int depth) {
+        this.depth = depth;
     }
 }

@@ -1,40 +1,51 @@
 package utility;
 
+import java.util.ArrayList;
 import java.util.Stack;
 
 import models.Node;
 
-class BinaryTree {
+class TreeHandler {
   
     private Node root;
       
-    private void iterativePreorder()
+    private void iterativePreOrder()
     { 
-        iterativePreorder(root); 
+        iterativePreOrder(root);
     } 
   
-    private void iterativePreorder(Node node) {
+    private void iterativePreOrder(Node node) {
           
         if (node == null) {
             return; 
         } 
   
         Stack<Node> nodeStack = new Stack<>();
-        nodeStack.push(root); 
-  
+        nodeStack.push(root);
+
         while (!nodeStack.empty()) {
-            Node mynode = nodeStack.peek();
-            System.out.print(mynode.getLabel() + " ");
+            Node myNode = nodeStack.peek();
+            printNode(myNode);
             nodeStack.pop();
 
-            for (Node children : node.getChildrens()) {
-                nodeStack.push(children);
+            ArrayList<Node> children = myNode.getChildrens();
+            for (int i = children.size() - 1; i >= 0; i--) {
+                Node item = children.get(i);
+                item.setDepth(myNode.getDepth() + 1);
+                nodeStack.push(item);
             }
         }
-    } 
-  
+    }
+
+    private void printNode(Node node) {
+        for (int i = 0; i < node.getDepth(); i++) {
+            System.out.print("| ");
+        }
+        System.out.println(node.getLabel());
+    }
+
     public static void main(String args[]) {
-        BinaryTree tree = new BinaryTree();
+        TreeHandler tree = new TreeHandler();
         Node nodeA = new Node("A");
         Node nodeB = new Node("B");
         Node nodeC = new Node("C");
@@ -57,7 +68,7 @@ class BinaryTree {
         nodeF.addChild(nodeI);
         nodeF.addChild(nodeJ);
         nodeF.addChild(nodeK);
-        tree.iterativePreorder();
+        tree.iterativePreOrder();
   
     } 
 } 
