@@ -13,31 +13,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Parser {
-    /*
-    public static Statement parseStatement(ArrayList<Token> input) {
-        Parser parser = new Parser(input);
-        Statement stmt = parser.parseStatement();
-        parser.consume(Token.Type.EOF);
-        return stmt;
-    }
-    
-    public static Expression parseExpr(ArrayList<Token> input) {
-        Parser parser = new Parser(input);
-        Expression expr = parser.parseExpr();
-        parser.consume(Token.Type.EOF);
-        return expr;
-    }
-    */
 
     private ArrayList<Token> input;
     private int inputIndex;
     private Token eof;
+    private StringBuilder parsingErrors;
+
+
 
     public Parser(ArrayList<Token> input) {
+        this.parsingErrors = new StringBuilder();
         this.input = input;
         this.inputIndex = 0;
+
         if (input.isEmpty()) {
-            this.eof = new Token(Token.Type.EOF, "<EOF>", 0, 0);
+            this.eof = new Token(Token.Type.EOF, "<EOF>", 1, 1);
         } else {
             Token last = input.get(input.size() - 1);
             this.eof = new Token(Token.Type.EOF, "<EOF>", last.getLine(), last.getCol());
@@ -46,6 +36,97 @@ public class Parser {
     }
 
 
+    public String getParsingErrorsString(){
+        return  this.parsingErrors.toString();
+    }
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private void addMissingTerminalError(Token.Type terminalType){
+        parsingErrors.append("line " + input.get(inputIndex - 1).getLine() + " : Syntax Error! Missing " +
+                            terminalType.getText() + "\n");
+    }
+
+    private void addUnexpectedTerminalError(Token terminalToken) {
+        parsingErrors.append("line " + terminalToken.getLine() + " : Syntax Error! Unexpected " +
+                            terminalToken.getType().getText() + "\n");
+    }
+
+    private void addWrongNonTerminalError(int line, String description) {
+        parsingErrors.append("line " + line + " : Syntax Error! Missing " + description + "\n");
+    }
+
+    private void addMissingEOFError(){
+        parsingErrors.append("line " + this.eof.getLine() + " : Syntax Error! Malformed Input" + "\n");
+    }
+
+    private void addUnexpectedEOFError(){
+        parsingErrors.append("line " + input.get(input.size() - 2).getLine() + " : Syntax Error! Unexpected EndOfFile" + "\n");
+    }
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private boolean handleWrongNonTerminalError(String nonTerminal) throws Exception {
+        boolean inFirst;
+        boolean inFollow;
+        boolean haveEpsilon;
+        Token currToken;
+
+        while(true) {
+            currToken = consume();
+
+            inFirst = currToken.isFirst(nonTerminal);
+            inFollow = currToken.isFollow(nonTerminal);
+            haveEpsilon = hasEPSILONInFirst(nonTerminal);
+            if(inFirst || (inFollow && haveEpsilon)){
+                inputIndex --;
+                break;
+            }
+
+            if(currToken.getType() == Token.Type.EOF) {
+                this.inputIndex --;
+                addUnexpectedEOFError();
+                fail("parsing stopped!");
+            }
+            else{
+                addUnexpectedTerminalError(currToken);
+            }
+        }
+
+        if(inFollow && !haveEpsilon){
+            addWrongNonTerminalError(input.get(inputIndex - 1).getLine(), nonTerminal);
+            return false;
+        }
+        return true;
+
+    }
+
+    private void handleMissingTerminalError(Token.Type terminalType) throws Exception {
+        if(isAllowedToConsumeT(terminalType))
+            consume(terminalType);
+        else {
+            if(terminalType == Token.Type.EOF){
+                addMissingEOFError();
+                fail("parsing stopped!");
+            }
+            if(peek().getType() == Token.Type.EOF){
+                addUnexpectedEOFError();
+                fail("parsing stopped!");
+            }
+            addMissingTerminalError(terminalType);
+        }
+
+    }
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 
     private boolean isAllowedToEnterNT(String NT){
         boolean r1 = input.get(inputIndex).isFirst(NT);
@@ -59,249 +140,269 @@ public class Parser {
 
     private boolean isAllowedToConsumeT(Token.Type terminalType){
         Token actual = peek();
-        return (actual.getType() == terminalType);
+        boolean allowed = false;
+        if(actual.getType() == terminalType)
+            allowed = true;
+
+        return allowed;
     }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 
     private boolean hasEPSILONInFirst(String NT){
         Token auxToken = new Token(Token.Type.EPSILON, "EPSILON");
         return auxToken.isFirst(NT);
     }
 
-    public void addInput(Token newToken){
-        this.input.add(newToken);
+    private int getCurrLine(){
+        return input.get(inputIndex).getLine();
     }
 
 
 ////////////////////////////////////////////////////////////////////////////
 
-    public boolean parse_program(){
-        boolean ret1 = isAllowedToEnterNT("DL") && parse_declarationList();
-        if(!ret1) return false;
+    public boolean parse_program() throws Exception {
 
-        boolean ret2 = isAllowedToConsumeT(Token.Type.EOF) && consume(Token.Type.EOF);
-        if(!ret2) return false;
+        if(isAllowedToEnterNT("DL") || handleWrongNonTerminalError("DL"))
+            parse_declarationList();
+
+        handleMissingTerminalError(Token.Type.EOF);
 
         return true;
     }
 
-    private boolean parse_declarationList(){
-        boolean ret1 = isAllowedToEnterNT("DL1") && parse_declarationList_1();
+    private boolean parse_declarationList() throws Exception {
+        if(isAllowedToEnterNT("DL1") || handleWrongNonTerminalError("DL1"))
+            parse_declarationList_1();
 
-        return ret1;
+        return true;
     }
 
-    private boolean parse_declarationList_1(){
+    private boolean parse_declarationList_1() throws Exception {
         boolean enter1 = isAllowedToEnterNT("D");
         boolean enter2 = isAllowedToPassEPSILON("DL1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("D") && parse_declaration() &&
-                    isAllowedToEnterNT("DL1") && parse_declarationList_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("DL1");
-
-        return ret;
-    }
-
-    private boolean parse_declaration(){
-        boolean ret1 = isAllowedToEnterNT("TS") && parse_typeSpecifier();
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID);
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToEnterNT("VDFD") && parse_varfunDeclaration();
-        if(!ret3) return false;
+        if(enter1) {
+            if(isAllowedToEnterNT("D") || handleWrongNonTerminalError("D"))
+                parse_declaration();
+            if(isAllowedToEnterNT("DL1") || handleWrongNonTerminalError("DL1"))
+                parse_declarationList_1();
+        }
+        else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_varfunDeclaration(){
+    private boolean parse_declaration() throws Exception {
+        if(isAllowedToEnterNT("TS") || handleWrongNonTerminalError("TS"))
+            parse_typeSpecifier();
+
+        handleMissingTerminalError(Token.Type.ID);
+
+        if(isAllowedToEnterNT("VDFD") || handleWrongNonTerminalError("VDFD"))
+            parse_varfunDeclaration();
+
+        return true;
+    }
+
+    private boolean parse_varfunDeclaration() throws Exception {
         boolean enter1 = isAllowedToEnterNT("VD");
         boolean enter2 = isAllowedToEnterNT("FD");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("VD") && parse_varDeclaration();
-        else if(enter2)
-            ret = isAllowedToEnterNT("FD") && parse_funDeclaration();
+        if(enter1) {
+            if(isAllowedToEnterNT("VD") || handleWrongNonTerminalError("VD"))
+                parse_varDeclaration();
+        }else if(enter2) {
+            if(isAllowedToEnterNT("FD") || handleWrongNonTerminalError("FD"))
+                parse_funDeclaration();
+        }
 
-        return ret;
+        return true;
     }
 
-    private boolean parse_varDeclaration(){
-        boolean ret1 = isAllowedToEnterNT("VD1") && parse_varDeclaration_1();
+    private boolean parse_varDeclaration() throws Exception {
+        if(isAllowedToEnterNT("VD1") || handleWrongNonTerminalError("VD1"))
+            parse_varDeclaration_1();
 
-        return ret1;
+        return true;
     }
 
-    private boolean parse_varDeclaration_1(){
+    private boolean parse_varDeclaration_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.SEMICOLON);
         boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS) && consume(Token.Type.OPEN_BRACKETS) &&
-                    isAllowedToConsumeT(Token.Type.INT_CONST) && consume(Token.Type.INT_CONST) &&
-                    isAllowedToConsumeT(Token.Type.CLOSE_BRACKETS) &&consume(Token.Type.CLOSE_BRACKETS) &&
-                    isAllowedToConsumeT(Token.Type.SEMICOLON) &&consume(Token.Type.SEMICOLON);
-
-        return ret;
-    }
-
-    private boolean parse_typeSpecifier(){
-        boolean enter1 = isAllowedToConsumeT(Token.Type.INT);
-        boolean enter2 = isAllowedToConsumeT(Token.Type.VOID);
-
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.INT) && consume(Token.Type.INT);
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.VOID) && consume(Token.Type.VOID);
-
-        return ret;
-    }
-
-    private boolean parse_funDeclaration(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES);
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToEnterNT("PAS") && parse_params();
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        if(!ret3) return false;
-
-        boolean ret4 = isAllowedToEnterNT("CS") && parse_compoundStmt();
-        if(!ret4) return false;
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.OPEN_BRACKETS);
+            handleMissingTerminalError(Token.Type.INT_CONST);
+            handleMissingTerminalError(Token.Type.CLOSE_BRACKETS);
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }
 
         return true;
     }
 
-    private boolean parse_params(){
+    private boolean parse_typeSpecifier() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.INT);
         boolean enter2 = isAllowedToConsumeT(Token.Type.VOID);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.INT) && consume(Token.Type.INT) &&
-                  isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                  isAllowedToEnterNT("PA1") && parse_param_1() &&
-                  isAllowedToEnterNT("PL1") && parse_paramList_1();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.VOID) && consume(Token.Type.VOID) &&
-                    isAllowedToEnterNT("PAS1") && parse_params_1();
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.INT);
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.VOID);
+        }
 
-        return ret;
+        return true;
     }
 
-    private boolean parse_params_1(){
+    private boolean parse_funDeclaration() throws Exception {
+        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
+
+        if(isAllowedToEnterNT("PAS") || handleWrongNonTerminalError("PAS"))
+            parse_params();
+
+        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
+
+        if(isAllowedToEnterNT("CS") || handleWrongNonTerminalError("CS"))
+            parse_compoundStmt();
+
+        return true;
+    }
+
+    private boolean parse_params() throws Exception {
+        boolean enter1 = isAllowedToConsumeT(Token.Type.INT);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.VOID);
+
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.INT);
+            handleMissingTerminalError(Token.Type.ID);
+
+            if(isAllowedToEnterNT("PA1") || handleWrongNonTerminalError("PA1"))
+                parse_param_1();
+
+            if(isAllowedToEnterNT("PL1") || handleWrongNonTerminalError("PL1"))
+                parse_paramList_1();
+
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.VOID);
+
+            if(isAllowedToEnterNT("PAS1") || handleWrongNonTerminalError("PAS1"))
+                parse_params_1();
+        }
+
+        return true;
+    }
+
+    private boolean parse_params_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.ID);
         boolean enter2 = isAllowedToPassEPSILON("PAS1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                    isAllowedToEnterNT("PA1") && parse_param_1() &&
-                    isAllowedToEnterNT("PL1") && parse_paramList_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("PAS1");
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.ID);
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("PA1") || handleWrongNonTerminalError("PA1"))
+                parse_param_1();
 
-    private boolean parse_paramList(){
-        boolean ret1 = isAllowedToEnterNT("PA") && parse_param();
-        if(!ret1) return false;
+            if(isAllowedToEnterNT("PL1") || handleWrongNonTerminalError("PL1"))
+                parse_paramList_1();
 
-        boolean ret2 = isAllowedToEnterNT("PL1") && parse_paramList_1();
-        if(!ret2) return false;
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_paramList_1(){
+    private boolean parse_paramList_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.COMMA);
         boolean enter2 = isAllowedToPassEPSILON("PL1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.COMMA) && consume(Token.Type.COMMA) &&
-                    isAllowedToEnterNT("PA") && parse_param() &&
-                    isAllowedToEnterNT("PL1") && parse_paramList_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("PL1");
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.COMMA);
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("PA") || handleWrongNonTerminalError("PA"))
+                parse_param();
 
-    private boolean parse_param(){
-        boolean ret1 = isAllowedToEnterNT("TS") && parse_typeSpecifier();
-        if(!ret1) return false;
+            if(isAllowedToEnterNT("PL1") || handleWrongNonTerminalError("PL1"))
+                parse_paramList_1();
 
-        boolean ret2 = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID);
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToEnterNT("PA1") && parse_param_1();
-        if(!ret3) return false;
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_param_1(){
+    private boolean parse_param() throws Exception {
+        if(isAllowedToEnterNT("TS") || handleWrongNonTerminalError("TS"))
+            parse_typeSpecifier();
+
+        handleMissingTerminalError(Token.Type.ID);
+
+        if(isAllowedToEnterNT("PA1") || handleWrongNonTerminalError("PA1"))
+            parse_param_1();
+
+        return true;
+    }
+
+    private boolean parse_param_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
         boolean enter2 = isAllowedToPassEPSILON("PA1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS) && consume(Token.Type.OPEN_BRACKETS) &&
-                    isAllowedToConsumeT(Token.Type.CLOSE_BRACKETS) && consume(Token.Type.CLOSE_BRACKETS);
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("PA1");
-
-        return ret;
-    }
-
-    private boolean parse_compoundStmt(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.OPEN_BRACES) && consume(Token.Type.OPEN_BRACES);
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToEnterNT("DL") && parse_declarationList();
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToEnterNT("SL") && parse_statementList();
-        if(!ret3) return false;
-
-        boolean ret4 = isAllowedToConsumeT(Token.Type.CLOSE_BRACES) && consume(Token.Type.CLOSE_BRACES);
-        if(!ret4) return false;
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.OPEN_BRACKETS);
+            handleMissingTerminalError(Token.Type.CLOSE_BRACKETS);
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_statementList(){
-        boolean ret1 = isAllowedToEnterNT("SL1") && parse_statementList_1();
+    private boolean parse_compoundStmt() throws Exception {
+        handleMissingTerminalError(Token.Type.OPEN_BRACES);
 
-        return ret1;
+        if(isAllowedToEnterNT("DL") || handleWrongNonTerminalError("DL"))
+            parse_declarationList();
+
+        if(isAllowedToEnterNT("SL") || handleWrongNonTerminalError("SL"))
+            parse_statementList();
+
+        handleMissingTerminalError(Token.Type.CLOSE_BRACES);
+
+        return true;
     }
 
-    private boolean parse_statementList_1(){
+    private boolean parse_statementList() throws Exception {
+        if(isAllowedToEnterNT("SL1") || handleWrongNonTerminalError("SL1"))
+            parse_statementList_1();
+
+        return true;
+    }
+
+    private boolean parse_statementList_1() throws Exception {
         boolean enter1 = isAllowedToEnterNT("S");
         boolean enter2 = isAllowedToPassEPSILON("SL1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("S") && parse_statement() &&
-                    isAllowedToEnterNT("SL1") && parse_statementList_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("SL1");
+        if(enter1) {
+            if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
+                parse_statement();
 
-        return ret;
+            if(isAllowedToEnterNT("SL1") || handleWrongNonTerminalError("SL1"))
+                parse_statementList_1();
+
+        }else if(enter2) {
+            return true;
+        }
+
+        return true;
     }
 
-    private boolean parse_statement(){
+    private boolean parse_statement() throws Exception {
         boolean enter1 = isAllowedToEnterNT("ES");
         boolean enter2 = isAllowedToEnterNT("CS");
         boolean enter3 = isAllowedToEnterNT("SS");
@@ -309,542 +410,579 @@ public class Parser {
         boolean enter5 = isAllowedToEnterNT("RS");
         boolean enter6 = isAllowedToEnterNT("SWS");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("ES") && parse_expressionStmt();
-        else if(enter2)
-            ret = isAllowedToEnterNT("CS") && parse_compoundStmt();
-        else if(enter3)
-            ret = isAllowedToEnterNT("SS") && parse_selectionStmt();
-        else if(enter4)
-            ret = isAllowedToEnterNT("IS") && parse_iterationStmt();
-        else if(enter5)
-            ret = isAllowedToEnterNT("RS") && parse_returnStmt();
-        else if(enter6)
-            ret = isAllowedToEnterNT("SWS") && parse_switchStmt();
+        if(enter1) {
+            if (isAllowedToEnterNT("ES") || handleWrongNonTerminalError("ES"))
+                parse_expressionStmt();
+        }else if(enter2) {
+            if (isAllowedToEnterNT("CS") || handleWrongNonTerminalError("CS"))
+                parse_compoundStmt();
+        }else if(enter3) {
+            if (isAllowedToEnterNT("SS") || handleWrongNonTerminalError("SS"))
+                parse_selectionStmt();
+        }else if(enter4) {
+            if (isAllowedToEnterNT("IS") || handleWrongNonTerminalError("IS"))
+                parse_iterationStmt();
+        }else if(enter5) {
+            if (isAllowedToEnterNT("RS") || handleWrongNonTerminalError("RS"))
+                parse_returnStmt();
+        }else if(enter6) {
+            if (isAllowedToEnterNT("SWS") || handleWrongNonTerminalError("SWS"))
+                parse_switchStmt();
+        }
 
-        return ret;
+        return true;
     }
 
-    private boolean parse_expressionStmt(){
+    private boolean parse_expressionStmt() throws Exception {
         boolean enter1 = isAllowedToEnterNT("E");
         boolean enter2 = isAllowedToConsumeT(Token.Type.CONTINUE);
         boolean enter3 = isAllowedToConsumeT(Token.Type.BREAK);
         boolean enter4 = isAllowedToConsumeT(Token.Type.SEMICOLON);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("E") && parse_expression() &&
-                    isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.CONTINUE) && consume(Token.Type.CONTINUE) &&
-                    isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-        else if(enter3)
-            ret = isAllowedToConsumeT(Token.Type.BREAK) && consume(Token.Type.BREAK) &&
-                    isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-        else if(enter4)
-            ret = isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-
-        return ret;
-    }
-
-    private boolean parse_selectionStmt(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.IF) && consume(Token.Type.IF);
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES);
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToEnterNT("E") && parse_expression();
-        if(!ret3) return false;
-
-        boolean ret4 = isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        if(!ret4) return false;
-
-        boolean ret5 = isAllowedToEnterNT("S") && parse_statement();
-        if(!ret5) return false;
-
-        boolean ret6 = isAllowedToConsumeT(Token.Type.ELSE) && consume(Token.Type.ELSE);
-        if(!ret6) return false;
-
-        boolean ret7 = isAllowedToEnterNT("S") && parse_statement();
-        if(!ret7) return false;
+        if(enter1) {
+            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+                parse_expression();
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.CONTINUE);
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }else if(enter3) {
+            handleMissingTerminalError(Token.Type.BREAK);
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }else if(enter4) {
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }
 
         return true;
     }
 
-    private boolean parse_iterationStmt(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.WHILE) && consume(Token.Type.WHILE);
-        if(!ret1) return false;
+    private boolean parse_selectionStmt() throws Exception {
+        handleMissingTerminalError(Token.Type.IF);
+        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
 
-        boolean ret2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES);
-        if(!ret2) return false;
+        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+            parse_expression();
 
-        boolean ret3 = isAllowedToEnterNT("E") && parse_expression();
-        if(!ret3) return false;
+        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
 
-        boolean ret4 = isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        if(!ret4) return false;
+        if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
+            parse_statement();
 
-        boolean ret5 = isAllowedToEnterNT("S") && parse_statement();
-        if(!ret5) return false;
+        handleMissingTerminalError(Token.Type.ELSE);
 
-        return true;
-    }
-
-    private boolean parse_returnStmt(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.RETURN) && consume(Token.Type.RETURN);
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToEnterNT("RS1") && parse_returnStmt_1();
-        if(!ret2) return false;
+        if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
+            parse_statement();
 
         return true;
     }
 
-    private boolean parse_returnStmt_1(){
+    private boolean parse_iterationStmt() throws Exception {
+        handleMissingTerminalError(Token.Type.WHILE);
+
+        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
+
+        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+            parse_expression();
+
+        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
+
+        if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
+            parse_statement();
+
+        return true;
+    }
+
+    private boolean parse_returnStmt() throws Exception {
+        handleMissingTerminalError(Token.Type.RETURN);
+
+        if(isAllowedToEnterNT("RS1") | handleWrongNonTerminalError("RS1"))
+            parse_returnStmt_1();
+
+        return true;
+    }
+
+    private boolean parse_returnStmt_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.SEMICOLON);
         boolean enter2 = isAllowedToEnterNT("E");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-        else if(enter2)
-            ret = isAllowedToEnterNT("E") && parse_expression() &&
-                    isAllowedToConsumeT(Token.Type.SEMICOLON) && consume(Token.Type.SEMICOLON);
-
-        return ret;
-    }
-
-    private boolean parse_switchStmt(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.SWITCH) && consume(Token.Type.SWITCH);
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES);
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToEnterNT("E") && parse_expression();
-        if(!ret3) return false;
-
-        boolean ret4 = isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        if(!ret4) return false;
-
-        boolean ret5 = isAllowedToConsumeT(Token.Type.OPEN_BRACES) && consume(Token.Type.OPEN_BRACES);
-        if(!ret5) return false;
-
-        boolean ret6 = isAllowedToEnterNT("CASS") && parse_caseStmts();
-        if(!ret6) return false;
-
-        boolean ret7 = isAllowedToEnterNT("DS") && parse_defaultStmt();
-        if(!ret7) return false;
-
-        boolean ret8 = isAllowedToConsumeT(Token.Type.CLOSE_BRACES) && consume(Token.Type.CLOSE_BRACES);
-        if(!ret8) return false;
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }else if(enter2) {
+            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+                parse_expression();
+            handleMissingTerminalError(Token.Type.SEMICOLON);
+        }
 
         return true;
     }
 
-    private boolean parse_caseStmts(){
-        boolean ret1 = isAllowedToEnterNT("CASS1") && parse_caseStmts_1();
+    private boolean parse_switchStmt() throws Exception {
+        handleMissingTerminalError(Token.Type.SWITCH);
 
-        return ret1;
+        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
+
+        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+            parse_expression();
+
+        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
+
+        handleMissingTerminalError(Token.Type.OPEN_BRACES);
+
+        if(isAllowedToEnterNT("CASS") || handleWrongNonTerminalError("CASS"))
+            parse_caseStmts();
+
+        if(isAllowedToEnterNT("DS") || handleWrongNonTerminalError("DS"))
+            parse_defaultStmt();
+
+        handleMissingTerminalError(Token.Type.CLOSE_BRACES);
+
+        return true;
     }
 
-    private boolean parse_caseStmts_1(){
+    private boolean parse_caseStmts() throws Exception {
+        if(isAllowedToEnterNT("CASS1") || handleWrongNonTerminalError("CASS1"))
+            parse_caseStmts_1();
+
+        return true;
+    }
+
+    private boolean parse_caseStmts_1() throws Exception {
         boolean enter1 = isAllowedToEnterNT("CAS");
         boolean enter2 = isAllowedToPassEPSILON("CASS1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("CAS") && parse_caseStmt() &&
-                isAllowedToEnterNT("CASS1") && parse_caseStmts_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("CASS1");
+        if(enter1) {
+            if(isAllowedToEnterNT("CAS") || handleWrongNonTerminalError("CAS"))
+                parse_caseStmt();
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("CASS1") || handleWrongNonTerminalError("CASS1"))
+                parse_caseStmts_1();
 
-    private boolean parse_caseStmt(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.CASE) && consume(Token.Type.CASE);
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToConsumeT(Token.Type.INT_CONST) && consume(Token.Type.INT_CONST);
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToConsumeT(Token.Type.COLON) && consume(Token.Type.COLON);
-        if(!ret3) return false;
-
-        boolean ret4 = isAllowedToEnterNT("SL") && parse_statementList();
-        if(!ret4) return false;
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_defaultStmt(){
+    private boolean parse_caseStmt() throws Exception {
+        handleMissingTerminalError(Token.Type.CASE);
+
+        handleMissingTerminalError(Token.Type.INT_CONST);
+
+        handleMissingTerminalError(Token.Type.COLON);
+
+        if(isAllowedToEnterNT("SL") || handleWrongNonTerminalError("SL"))
+            parse_statementList();
+
+        return true;
+    }
+
+    private boolean parse_defaultStmt() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.DEFAULT);
         boolean enter2 = isAllowedToPassEPSILON("DS");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.DEFAULT) && consume(Token.Type.DEFAULT) &&
-                isAllowedToConsumeT(Token.Type.COLON) && consume(Token.Type.COLON) &&
-                isAllowedToEnterNT("SL") && parse_statementList();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("DS");
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.DEFAULT);
+            handleMissingTerminalError(Token.Type.COLON);
 
-        return ret;
+            if(isAllowedToEnterNT("SL") || handleWrongNonTerminalError("SL"))
+                parse_statementList();
+
+        }else if(enter2) {
+            return true;
+        }
+
+        return true;
     }
 
-    private boolean parse_expression(){
+    private boolean parse_expression() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.ID);
         boolean enter2 = isAllowedToEnterNT("SE2");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                    isAllowedToEnterNT("E2") && parse_expression_2();
-        else if(enter2)
-            ret = isAllowedToEnterNT("SE2") && parse_simpleExpression_2();
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.ID);
 
-        return ret;
+            if(isAllowedToEnterNT("E2") || handleWrongNonTerminalError("E2"))
+                parse_expression_2();
+
+        }else if(enter2) {
+            if(isAllowedToEnterNT("SE2") || handleWrongNonTerminalError("SE2"))
+                parse_simpleExpression_2();
+        }
+
+        return true;
     }
 
-    private boolean parse_expression_1(){
+    private boolean parse_expression_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.ASSIGN);
         boolean enter2 = isAllowedToEnterNT("T1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.ASSIGN) && consume(Token.Type.ASSIGN) &&
-                    isAllowedToEnterNT("E") && parse_expression();
-        else if(enter2)
-            ret = isAllowedToEnterNT("T1") && parse_term_1() &&
-                    isAllowedToEnterNT("AE1") && parse_additiveExpression_1() &&
-                    isAllowedToEnterNT("SE1") && parse_simpleExpression_1();
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.ASSIGN);
 
-        return ret;
+            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+                parse_expression();
+
+        }else if(enter2) {
+            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
+                parse_term_1();
+
+            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
+                parse_additiveExpression_1();
+
+            if(isAllowedToEnterNT("SE1") || handleWrongNonTerminalError("SE1"))
+                parse_simpleExpression_1();
+        }
+
+        return true;
     }
 
-    private boolean parse_expression_2(){
+    private boolean parse_expression_2() throws Exception {
         boolean enter1 = isAllowedToEnterNT("V1");
         boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("V1") && parse_var_1() &&
-                isAllowedToEnterNT("E1") && parse_expression_1();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES) &&
-                isAllowedToEnterNT("AR") && parse_args() &&
-                isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES) &&
-                isAllowedToEnterNT("T1") && parse_term_1() &&
-                isAllowedToEnterNT("AE1") && parse_additiveExpression_1() &&
-                isAllowedToEnterNT("SE1") && parse_simpleExpression_1();
+        if(enter1) {
+            if(isAllowedToEnterNT("V1") || handleWrongNonTerminalError("V1"))
+                parse_var_1();
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("E1") || handleWrongNonTerminalError("E1"))
+                parse_expression_1();
 
-    private boolean parse_var(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID);
-        if(!ret1) return false;
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
+            if(isAllowedToEnterNT("AR") || handleWrongNonTerminalError("AR"))
+                parse_args();
 
-        boolean ret2 = isAllowedToEnterNT("V1") && parse_var_1();
-        if(!ret2) return false;
+            handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
+
+
+            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
+                parse_term_1();
+
+            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
+                parse_additiveExpression_1();
+
+            if(isAllowedToEnterNT("SE1") || handleWrongNonTerminalError("SE1"))
+                parse_simpleExpression_1();
+        }
 
         return true;
     }
 
-    private boolean parse_var_1(){
+    private boolean parse_var_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
         boolean enter2 = isAllowedToPassEPSILON("V1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS) && consume(Token.Type.OPEN_BRACKETS) &&
-                    isAllowedToEnterNT("E") && parse_expression() &&
-                    isAllowedToConsumeT(Token.Type.CLOSE_BRACKETS) && consume(Token.Type.CLOSE_BRACKETS);
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("V1");
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.OPEN_BRACKETS);
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+                parse_expression();
 
-    private boolean parse_simpleExpression(){
-        boolean enter1 = isAllowedToEnterNT("SE2");
-        boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
+            handleMissingTerminalError(Token.Type.CLOSE_BRACKETS);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("SE2") && parse_simpleExpression_2();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                isAllowedToEnterNT("VC") && parse_varcall() &&
-                isAllowedToEnterNT("T1") && parse_term_1() &&
-                isAllowedToEnterNT("AE1") && parse_additiveExpression_1() &&
-                isAllowedToEnterNT("SE1") && parse_simpleExpression_1();
-
-        return ret;
-    }
-
-    private boolean parse_simpleExpression_2(){
-        boolean ret1 = isAllowedToEnterNT("AE2") && parse_additiveExpression_2();
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToEnterNT("SE1") && parse_simpleExpression_1();
-        if(!ret2) return false;
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_simpleExpression_1(){
+    private boolean parse_simpleExpression_2() throws Exception {
+        if(isAllowedToEnterNT("AE2") || handleWrongNonTerminalError("AE2"))
+            parse_additiveExpression_2();
+
+        if(isAllowedToEnterNT("SE1") || handleWrongNonTerminalError("SE1"))
+            parse_simpleExpression_1();
+
+        return true;
+    }
+
+    private boolean parse_simpleExpression_1() throws Exception {
         boolean enter1 = isAllowedToEnterNT("R");
         boolean enter2 = isAllowedToPassEPSILON("SE1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("R") && parse_relop() &&
-                    isAllowedToEnterNT("AE") && parse_additiveExpression();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("SE1");
+        if(enter1) {
+            if(isAllowedToEnterNT("R") || handleWrongNonTerminalError("R"))
+                parse_relop();
 
-        return ret;
+            if(isAllowedToEnterNT("AE") || handleWrongNonTerminalError("AE"))
+                parse_additiveExpression();
+
+        }else if(enter2) {
+            return true;
+        }
+
+        return true;
     }
 
-    private boolean parse_relop(){
+    private boolean parse_relop() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.LESS_THAN);
         boolean enter2 = isAllowedToConsumeT(Token.Type.EQ);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.LESS_THAN) && consume(Token.Type.LESS_THAN);
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.EQ) && consume(Token.Type.EQ);
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.LESS_THAN);
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.EQ);
+        }
 
-        return ret;
+        return true;
     }
 
-    private boolean parse_additiveExpression(){
+    private boolean parse_additiveExpression() throws Exception {
         boolean enter1 = isAllowedToEnterNT("AE2");
         boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("AE2") && parse_additiveExpression_2();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                isAllowedToEnterNT("VC") && parse_varcall() &&
-                isAllowedToEnterNT("T1") && parse_term_1() &&
-                isAllowedToEnterNT("AE1") && parse_additiveExpression_1();
+        if(enter1) {
+            if(isAllowedToEnterNT("AE2") || handleWrongNonTerminalError("AE2"))
+                parse_additiveExpression_2();
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.ID);
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("VC") || handleWrongNonTerminalError("VC"))
+                parse_varcall();
 
-    private boolean parse_additiveExpression_2(){
-        boolean ret1 = isAllowedToEnterNT("T2") && parse_term_2();
-        if(!ret1) return false;
+            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
+                parse_term_1();
 
-        boolean ret2 = isAllowedToEnterNT("AE1") && parse_additiveExpression_1();
-        if(!ret2) return false;
+            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
+                parse_additiveExpression_1();
+        }
 
         return true;
     }
 
-    private boolean parse_additiveExpression_1(){
+    private boolean parse_additiveExpression_2() throws Exception {
+        if(isAllowedToEnterNT("T2") || handleWrongNonTerminalError("T2"))
+            parse_term_2();
+
+        if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
+            parse_additiveExpression_1();
+
+        return true;
+    }
+
+    private boolean parse_additiveExpression_1() throws Exception {
         boolean enter1 = isAllowedToEnterNT("A");
         boolean enter2 = isAllowedToPassEPSILON("AE1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("A") && parse_addop() &&
-                isAllowedToEnterNT("T") && parse_term() &&
-                isAllowedToEnterNT("AE1") && parse_additiveExpression_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("AE1");
+        if(enter1) {
+            if(isAllowedToEnterNT("A") || handleWrongNonTerminalError("A"))
+                parse_addop();
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("T") || handleWrongNonTerminalError("T"))
+                parse_term();
 
-    private boolean parse_addop(){
-        boolean enter1 = isAllowedToConsumeT(Token.Type.PLUS);
-        boolean enter2 = isAllowedToConsumeT(Token.Type.MINUS);
+            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
+                parse_additiveExpression_1();
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.PLUS) && consume(Token.Type.PLUS);
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.MINUS) && consume(Token.Type.MINUS);
-
-        return ret;
-    }
-
-    private boolean parse_term(){
-        boolean enter1 = isAllowedToEnterNT("T2");
-        boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
-
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("T2") && parse_term_2();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                isAllowedToEnterNT("VC") && parse_varcall() &&
-                isAllowedToEnterNT("T1") && parse_term_1();
-
-        return ret;
-    }
-
-    private boolean parse_term_2(){
-        boolean ret1 = isAllowedToEnterNT("SF1") && parse_signedFactor_1();
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToEnterNT("T1") && parse_term_1();
-        if(!ret2) return false;
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_term_1(){
+    private boolean parse_addop() throws Exception {
+        boolean enter1 = isAllowedToConsumeT(Token.Type.PLUS);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.MINUS);
+
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.PLUS);
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.MINUS);
+        }
+
+        return true;
+    }
+
+    private boolean parse_term() throws Exception {
+        boolean enter1 = isAllowedToEnterNT("T2");
+        boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
+
+        if(enter1) {
+            if(isAllowedToEnterNT("T2") || handleWrongNonTerminalError("T2"))
+                parse_term_2();
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.ID);
+
+            if(isAllowedToEnterNT("VC") || handleWrongNonTerminalError("VC"))
+                parse_varcall();
+
+            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
+                parse_term_1();
+        }
+
+        return true;
+    }
+
+    private boolean parse_term_2() throws Exception {
+        if(isAllowedToEnterNT("SF1") || handleWrongNonTerminalError("SF1"))
+            parse_signedFactor_1();
+
+        if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
+            parse_term_1();
+
+        return true;
+    }
+
+    private boolean parse_term_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.TIMES);
         boolean enter2 = isAllowedToPassEPSILON("T1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.TIMES) && consume(Token.Type.TIMES) &&
-                isAllowedToEnterNT("SF") && parse_signedFactor() &&
-                isAllowedToEnterNT("T1") && parse_term_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("T1");
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.TIMES);
 
-        return ret;
+            if(isAllowedToEnterNT("SF") || handleWrongNonTerminalError("SF"))
+                parse_signedFactor();
+
+            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("SF"))
+                parse_term_1();
+
+        }else if(enter2) {
+            return true;
+        }
+
+        return true;
     }
 
-    private boolean parse_signedFactor(){
+    private boolean parse_signedFactor() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.ID);
         boolean enter2 = isAllowedToEnterNT("SF1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                isAllowedToEnterNT("VC") && parse_varcall();
-        else if(enter2)
-            ret = isAllowedToEnterNT("SF1") && parse_signedFactor_1();
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.ID);
 
-        return ret;
+            if(isAllowedToEnterNT("VC") | handleWrongNonTerminalError("VC"))
+                parse_varcall();
+
+        }else if(enter2) {
+            if(isAllowedToEnterNT("SF1") || handleWrongNonTerminalError("SF1"))
+                parse_signedFactor_1();
+        }
+
+        return true;
     }
 
-    private boolean parse_signedFactor_1(){
+    private boolean parse_signedFactor_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.PLUS);
         boolean enter2 = isAllowedToConsumeT(Token.Type.MINUS);
         boolean enter3 = isAllowedToEnterNT("F1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.PLUS) && consume(Token.Type.PLUS) &&
-                    isAllowedToEnterNT("F") && parse_factor();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.MINUS) && consume(Token.Type.MINUS) &&
-                    isAllowedToEnterNT("F") && parse_factor();
-        else if(enter3)
-            ret = isAllowedToEnterNT("F1") && parse_factor_1();
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.PLUS);
+            if(isAllowedToEnterNT("F") || handleWrongNonTerminalError("F"))
+                parse_factor();
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.MINUS);
+            if(isAllowedToEnterNT("F") || handleWrongNonTerminalError("F"))
+                parse_factor();
+        }else if(enter3) {
+            if(isAllowedToEnterNT("F1") || handleWrongNonTerminalError("F1"))
+                parse_factor_1();
+        }
 
-        return ret;
+        return true;
     }
 
-    private boolean parse_factor(){
+    private boolean parse_factor() throws Exception {
         boolean enter1 = isAllowedToEnterNT("F1");
         boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("F1") && parse_factor_1();
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID) &&
-                isAllowedToEnterNT("VC") && parse_varcall();
+        if(enter1) {
+            if(isAllowedToEnterNT("F1") || handleWrongNonTerminalError("F1"))
+                parse_factor_1();
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.ID);
 
-        return ret;
+            if(isAllowedToEnterNT("VC") || handleWrongNonTerminalError("VC"))
+                parse_varcall();
+        }
+
+        return true;
     }
 
-    private boolean parse_factor_1(){
+    private boolean parse_factor_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
         boolean enter2 = isAllowedToConsumeT(Token.Type.INT_CONST);
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES) &&
-                    isAllowedToEnterNT("E") && parse_expression() &&
-                    isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        else if(enter2)
-            ret = isAllowedToConsumeT(Token.Type.INT_CONST) && consume(Token.Type.INT_CONST);
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
 
-        return ret;
+            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+                parse_expression();
+
+            handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
+
+        }else if(enter2) {
+            handleMissingTerminalError(Token.Type.INT_CONST);
+        }
+
+        return true;
     }
 
-    private boolean parse_varcall(){
+    private boolean parse_varcall() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
         boolean enter2 = isAllowedToEnterNT("V1") && parse_var_1();
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES) &&
-                isAllowedToEnterNT("AR") && parse_args() &&
-                    isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        else if(enter2)
-            ret = isAllowedToEnterNT("V1") && parse_var_1();
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
 
-        return ret;
-    }
+            if(isAllowedToEnterNT("AR") || handleWrongNonTerminalError("AR"))
+                parse_args();
 
-    private boolean parse_call(){
-        boolean ret1 = isAllowedToConsumeT(Token.Type.ID) && consume(Token.Type.ID);
-        if(!ret1) return false;
+            handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
 
-        boolean ret2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES) && consume(Token.Type.OPEN_PARENTHESES);
-        if(!ret2) return false;
-
-        boolean ret3 = isAllowedToEnterNT("AR") && parse_args();
-        if(!ret3) return false;
-
-        boolean ret4 = isAllowedToConsumeT(Token.Type.CLOSE_PARENTHESES) && consume(Token.Type.CLOSE_PARENTHESES);
-        if(!ret4) return false;
+        }else if(enter2) {
+            if(isAllowedToEnterNT("V1") || handleWrongNonTerminalError("V1"))
+                parse_var_1();
+        }
 
         return true;
     }
 
-    private boolean parse_args(){
+    private boolean parse_args() throws Exception {
         boolean enter1 = isAllowedToEnterNT("ARL");
         boolean enter2 = isAllowedToPassEPSILON("AR");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToEnterNT("ARL") && parse_argList();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("AR");
-
-        return ret;
-    }
-
-    private boolean parse_argList(){
-        boolean ret1 = isAllowedToEnterNT("E") && parse_expression();
-        if(!ret1) return false;
-
-        boolean ret2 = isAllowedToEnterNT("ARL1") && parse_argList_1();
-        if(!ret2) return false;
+        if(enter1) {
+            if(isAllowedToEnterNT("ARL") || handleWrongNonTerminalError("ARL"))
+                parse_argList();
+        }else if(enter2) {
+            return true;
+        }
 
         return true;
     }
 
-    private boolean parse_argList_1(){
+    private boolean parse_argList() throws Exception {
+        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+            parse_expression();
+
+        if(isAllowedToEnterNT("ARL1") || handleWrongNonTerminalError("ARL1"))
+            parse_argList_1();
+
+        return true;
+    }
+
+    private boolean parse_argList_1() throws Exception {
         boolean enter1 = isAllowedToConsumeT(Token.Type.COMMA);
         boolean enter2 = isAllowedToPassEPSILON("ARL1");
 
-        boolean ret = false;
-        if(enter1)
-            ret = isAllowedToConsumeT(Token.Type.COMMA) && consume(Token.Type.COMMA) &&
-                isAllowedToEnterNT("E") && parse_expression() &&
-                isAllowedToEnterNT("ARL1") && parse_argList_1();
-        else if(enter2)
-            ret = isAllowedToPassEPSILON("ARL1");
+        if(enter1) {
+            handleMissingTerminalError(Token.Type.COMMA);
 
-        return ret;
+            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
+                parse_expression();
+
+            if(isAllowedToEnterNT("ARL1") || handleWrongNonTerminalError("ARL1"))
+                parse_argList_1();
+
+        }else if(enter2) {
+            return  true;
+        }
+
+        return true;
     }
 
 
@@ -1041,10 +1179,6 @@ public class Parser {
         return peekAtOffset(0);
     }
 
-    private Token peekSecond() {
-        return peekAtOffset(1);
-    }
-
     private Token peekAtOffset(int offset) {
         if (inputIndex + offset < input.size()) {
             return input.get(inputIndex + offset);
@@ -1052,8 +1186,6 @@ public class Parser {
             return eof;
         }
     }
-
-
 
     private boolean consume(Token.Type expected) {
         Token actual = peek();
@@ -1071,11 +1203,8 @@ public class Parser {
         return tok;
     }
 
-
-
-    private <T> T fail(String error) {
-        Token t = peek();
-        throw new ParseException("Parse error near line " + t.getLine() + " col " + t.getCol()+ ": " + error);
+    private void fail(String error) throws Exception {
+        throw new Exception(error);
     }
 
 

@@ -18,6 +18,7 @@ public class Tokenizer {
     private int line;
     private int col;
 
+
     public ArrayList<Token> getResult() {
         return result;
     }
@@ -30,41 +31,16 @@ public class Tokenizer {
         this.col = 1;
     }
 
-    public static Map<String, ArrayList<Token>> get_next_token(String input) {
-        // reading from the file "input.txt":
-        try {
-            File file = new File("input.txt");
-            if (file.createNewFile()) {
-                System.out.println("File " + file.getName() + " just created. Please try again.");
-            } else {
-                //System.out.println("file already exists");
-                BufferedReader br = new BufferedReader(new FileReader(file));
-                StringBuilder sb = new StringBuilder();
-                String line = br.readLine();
 
-                while ( line != null ) {
-                    sb.append( line );
-                    sb.append( '\n' );
-                    line = br.readLine();
-                }
 
-                input = sb.toString();
-                br.close();
-            }
-        } catch (IOException e) {
-            System.err.println("error occurred!");
-        }
-
-        //tokenizing:
-        Tokenizer tokenizer = new Tokenizer(input);
-        tokenizer.get_next_token();
-
-        //making output strings ready to be written in files:
+    public String getResultString() {
         StringBuilder result_sb = new StringBuilder();
         StringBuilder lexical_errors_sb = new StringBuilder();
+
         int line = 0;
         boolean isFirstTime = true;
-        for (Token token : tokenizer.result) {
+
+        for (Token token : this.result) {
             if (token.getType().getGroup().equals("WHITESPACE"))
                 continue;
             if (token.getLine() > line) {
@@ -77,9 +53,19 @@ public class Tokenizer {
             result_sb.append(token + " ");
             isFirstTime = false;
         }
-        line = 0;
-        isFirstTime = true;
-        for (Token token : tokenizer.lexical_errors) {
+
+        return result_sb.toString();
+
+    }
+
+    public String getLexicalErrorsString(){
+        StringBuilder result_sb = new StringBuilder();
+        StringBuilder lexical_errors_sb = new StringBuilder();
+
+        int line = 0;
+        boolean isFirstTime = true;
+
+        for (Token token : this.lexical_errors) {
             if (token.getLine() > line) {
                 line = token.getLine();
                 if(isFirstTime)
@@ -91,28 +77,9 @@ public class Tokenizer {
             isFirstTime = false;
         }
 
-        //writing in files "scanner.txt" and "lexical_errors.txt":
-        try {
-            BufferedWriter bw1 = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream("scanner.txt")));
-            bw1.write(result_sb.toString());
-            bw1.close();
-            BufferedWriter bw2 = new BufferedWriter(new OutputStreamWriter(
-                    new FileOutputStream("lexical_errors.txt")));
-            bw2.write(lexical_errors_sb.toString());
-            bw2.close();
-        } catch (IOException e) {
-            System.err.println("error occurred!");
-        }
+        return lexical_errors_sb.toString();
 
-        //returing result and lexical_errors:
-        Map<String, ArrayList<Token>> map = new HashMap<>();
-        map.put("result", tokenizer.result);
-        map.put("lexical_errors", tokenizer.lexical_errors);
-        return map;
     }
-
-
 
 
 
@@ -193,19 +160,6 @@ public class Tokenizer {
         }
     }
 
-//    private boolean tryKeywordOrIdentifier() {
-//        if (tryRegex(identifierPattern, tokenizer.Token.parser.models.Type.ID, true)) {
-//            /*tokenizer.Token tok = result.get(result.size() - 1);
-//            parser.models.Type kwType = utility.MyUtils.getKeywords().get(tok.getText());
-//            if (kwType != null) {
-//                tok = new tokenizer.Token(kwType, tok.getText(), line, col);
-//                result.set(result.size() - 1, tok);
-//            }*/
-//            return true;
-//        } else {
-//            return false;
-//        }
-//    }
 
     private void skipWhitespace() {
         int i = 0;

@@ -969,7 +969,7 @@ public class Token {
 
         EOF("eof", "EOF"),
 
-        INT_CONST("int", "NUM"),
+        INT_CONST("num", "NUM"),
         BOOL_CONST("bool", "BOOL"),
         ID("id", "ID"),
 
