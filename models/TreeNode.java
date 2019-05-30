@@ -2,25 +2,25 @@ package models;
 
 import java.util.ArrayList;
 
-public class Node {
+public class TreeNode {
     private String label;
-    private ArrayList<Node> childrens;
+    private ArrayList<TreeNode> childrens;
     private int depth = 0;
 
-    public Node(String label) {
+    public TreeNode(String label) {
         this.label = label;
         childrens = new ArrayList<>();
     }
 
-    public void addChild(Node node){
-        childrens.add(node);
+    public void addChild(TreeNode treeNode){
+        childrens.add(treeNode);
     }
 
     public String getLabel() {
         return label;
     }
 
-    public ArrayList<Node> getChildrens() {
+    public ArrayList<TreeNode> getChildrens() {
         return childrens;
     }
 

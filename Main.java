@@ -25,11 +25,7 @@ public class Main {
             parser.parse_program();
         }catch (Exception ignored){ /* do nothing */ }
         FileHelper.writeOutput(parser.getParsingErrorsString(), "parsingErrors.txt");
-        //graph// FileHelper.writeOutput(tokenizer.getLexicalErrorsString(), "lexicalErrors.txt");
-
-
-
-
+        FileHelper.writeOutput(parser.getParseTreeString(), "parseTree.txt");
 
 
 

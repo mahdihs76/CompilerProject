@@ -3,72 +3,84 @@ package utility;
 import java.util.ArrayList;
 import java.util.Stack;
 
-import models.Node;
+import models.TreeNode;
 
-class TreeHandler {
+public class TreeHandler {
   
-    private Node root;
-      
-    private void iterativePreOrder()
-    { 
-        iterativePreOrder(root);
-    } 
-  
-    private void iterativePreOrder(Node node) {
+
+    public static String iterativePreOrder(TreeNode treeRoot) {
           
-        if (node == null) {
-            return; 
-        } 
+        if (treeRoot == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
   
-        Stack<Node> nodeStack = new Stack<>();
-        nodeStack.push(root);
+        Stack<TreeNode> treeNodeStack = new Stack<>();
+        treeNodeStack.push(treeRoot);
 
-        while (!nodeStack.empty()) {
-            Node myNode = nodeStack.peek();
-            printNode(myNode);
-            nodeStack.pop();
+        while (!treeNodeStack.empty()) {
+            TreeNode myTreeNode = treeNodeStack.peek();
 
-            ArrayList<Node> children = myNode.getChildrens();
+            sb.append(printNode(myTreeNode));
+            sb.append("\n");
+
+            treeNodeStack.pop();
+
+            ArrayList<TreeNode> children = myTreeNode.getChildrens();
             for (int i = children.size() - 1; i >= 0; i--) {
-                Node item = children.get(i);
-                item.setDepth(myNode.getDepth() + 1);
-                nodeStack.push(item);
+                TreeNode item = children.get(i);
+                item.setDepth(myTreeNode.getDepth() + 1 + myTreeNode.getLabel().length() / 2);
+                treeNodeStack.push(item);
             }
         }
+        return sb.toString();
     }
 
-    private void printNode(Node node) {
-        for (int i = 0; i < node.getDepth(); i++) {
-            System.out.print("| ");
+    public static String printNode(TreeNode treeNode) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < treeNode.getDepth(); i++) {
+            sb.append("| ");
         }
-        System.out.println(node.getLabel());
+        sb.append(treeNode.getLabel());
+
+        return sb.toString();
     }
+
+
+
 
     public static void main(String args[]) {
         TreeHandler tree = new TreeHandler();
-        Node nodeA = new Node("A");
-        Node nodeB = new Node("B");
-        Node nodeC = new Node("C");
-        Node nodeD = new Node("D");
-        Node nodeE = new Node("E");
-        Node nodeF = new Node("F");
-        Node nodeG = new Node("G");
-        Node nodeH = new Node("H");
-        Node nodeI = new Node("I");
-        Node nodeJ = new Node("J");
-        Node nodeK = new Node("K");
-        tree.root = nodeA;
-        tree.root.addChild(nodeB);
-        tree.root.addChild(nodeC);
-        nodeB.addChild(nodeD);
-        nodeD.addChild(nodeG);
-        nodeD.addChild(nodeH);
-        nodeC.addChild(nodeE);
-        nodeC.addChild(nodeF);
-        nodeF.addChild(nodeI);
-        nodeF.addChild(nodeJ);
-        nodeF.addChild(nodeK);
-        tree.iterativePreOrder();
+        TreeNode treeNodeA = new TreeNode("A");
+        TreeNode treeNodeB = new TreeNode("B");
+        TreeNode treeNodeC = new TreeNode("C");
+        TreeNode treeNodeD = new TreeNode("DDD");
+        TreeNode treeNodeE = new TreeNode("E");
+        TreeNode treeNodeF = new TreeNode("F");
+        TreeNode treeNodeG = new TreeNode("G");
+        TreeNode treeNodeH = new TreeNode("H");
+        TreeNode treeNodeI = new TreeNode("I");
+        TreeNode treeNodeJ = new TreeNode("J");
+        TreeNode treeNodeK = new TreeNode("K");
+
+        TreeNode root = treeNodeA;
+        root.addChild(treeNodeB);
+        root.addChild(treeNodeC);
+
+        treeNodeB.addChild(treeNodeD);
+        treeNodeD.addChild(treeNodeG);
+        treeNodeD.addChild(treeNodeH);
+        treeNodeC.addChild(treeNodeE);
+        treeNodeC.addChild(treeNodeF);
+        treeNodeF.addChild(treeNodeI);
+        treeNodeF.addChild(treeNodeJ);
+        treeNodeF.addChild(treeNodeK);
+
+        System.out.println(iterativePreOrder(root));
   
-    } 
+    }
+
+
+
+
 } 
