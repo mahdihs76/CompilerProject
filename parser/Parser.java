@@ -1,21 +1,13 @@
 package parser;
 
-import com.sun.source.tree.Tree;
-import parser.models.Expression;
-import parser.models.Statement;
-import parser.models.Type;
-import parser.models.expressions.*;
-import parser.models.statements.*;
-import parser.models.types.BoolType;
-import parser.models.types.IntType;
-import tokenizer.Token;
 import models.TreeNode;
+import semantic_analysis.SemanticAnalyser;
+import tokenizer.Token;
+import tokenizer.Tokenizer;
 import utility.TreeHandler;
 
-
 import java.util.ArrayList;
-import java.util.List;
-
+import semantic_analysis.SemanticAnalyser.ActionType;
 
 
 public class Parser {
@@ -24,25 +16,25 @@ public class Parser {
     private int inputIndex;
     private Token eof;
     private StringBuilder parsingErrors;
-
+    private Tokenizer tokenizer;
     private TreeNode parseTreeRoot;
 
+    private SemanticAnalyser sa;
 
-    public Parser(ArrayList<Token> input) {
+
+
+    public Parser(Tokenizer tokenizer) {
         this.parsingErrors = new StringBuilder();
-        this.input = input;
+        this.tokenizer = tokenizer;
+
+        this.input = new ArrayList<Token>();
+        this.input.add(tokenizer.get_next_token());
+
         this.inputIndex = 0;
 
         this.parseTreeRoot = new TreeNode("P");
 
-
-        if (input.isEmpty()) {
-            this.eof = new Token(Token.Type.EOF, "<EOF>", 1, 1);
-        } else {
-            Token last = input.get(input.size() - 1);
-            this.eof = new Token(Token.Type.EOF, "<EOF>", last.getLine(), last.getCol());
-        }
-        input.add(this.eof);
+        this.sa = new SemanticAnalyser();
     }
 
 
@@ -68,8 +60,101 @@ public class Parser {
                             terminalToken.getType().getText() + "\n");
     }
 
-    private void addWrongNonTerminalError(int line, String description) {
-        parsingErrors.append("line " + line + " : Syntax Error! Missing " + description + "\n");
+
+    private String NTDescription(String NT) {
+        switch(NT){
+            case "P":
+                return "program";
+            case "DL":
+                return "declaration list";
+            case "D":
+                return "declaration";
+            case "TS":
+                return "type specifier";
+            case "VDFD":
+                return "variable or function declaration";
+            case "VD":
+                return "variable declaration";
+            case "FD":
+                return "function declaration";
+            case "PARS":
+                return "function parameters";
+            case "VPAR":
+                return "function's void parameter";
+            case "PL":
+                return "function parameters";
+            case "BRCK":
+                return "function's array parameter";
+            case "CS":
+                return "compound statement";
+            case "SL":
+                return "statement list";
+            case "S":
+                return "statement";
+            case "ES":
+                return "expression statement";
+            case "SS":
+                return "selection statement";
+            case "IS":
+                return "iteration statement";
+            case "RS":
+                return "return statement";
+            case "RVAL":
+                return "return value statement";
+            case "SWS":
+                return "switch statement";
+            case "CASS":
+                return "case statements";
+            case "DS":
+                return "default statement";
+            case "E":
+                return "expression";
+            case "EID":
+                return "identifier in expression";
+            case "EID1":
+                return "array identifier in expression";
+            case "SE1":
+                return "simple expression - first part";
+            case "AE":
+                return "additional expression";
+            case "AE1":
+                return "part of additional expression";
+            case "A":
+                return "additive operation";
+            case "R":
+                return "relative operation";
+            case "T":
+                return "term";
+            case "T1":
+                return "part of term";
+            case "SF":
+                return "signed factor";
+            case "SF1":
+                return "part of signed factor";
+            case "F":
+                return "factor";
+            case "F1":
+                return "part of factor";
+            case "VC":
+                return "variable or function call";
+            case "VC1":
+                return "part of variable or function call";
+            case "VC2":
+                return "part of variable or function call";
+            case "ARGS":
+                return "function's arguments";
+            case "ARL":
+                return "function's argument list";
+            case "ARL1":
+                return "part of function's arguments";
+            default:
+                return "non terminal";
+        }
+    }
+
+
+    private void addWrongNonTerminalError(int line, String NT) {
+        parsingErrors.append("line " + line + " : Syntax Error! Missing " + NTDescription(NT) + "\n");
     }
 
     private void addMissingEOFError(){
@@ -97,7 +182,7 @@ public class Parser {
             inFirst = currToken.isFirst(nonTerminal);
             inFollow = currToken.isFollow(nonTerminal);
             haveEpsilon = hasEPSILONInFirst(nonTerminal);
-            if(inFirst || (inFollow && haveEpsilon)){
+            if(inFirst || inFollow){
                 inputIndex --;
                 break;
             }
@@ -175,61 +260,92 @@ public class Parser {
 
 ////////////////////////////////////////////////////////////////////////////
 
-    public boolean parse_program() throws Exception {
-        if(isAllowedToEnterNT("DL") || handleWrongNonTerminalError("DL"))
-            parse_declarationList(this.parseTreeRoot);
-        else {
-            TreeNode child = new TreeNode("DL");
-            child.addChild(new TreeNode("ε"));
-            this.parseTreeRoot.addChild(child);
+    private boolean callParseFunction(String nonTerminal, TreeNode thisNode) throws Exception {
+        switch (nonTerminal) {
+            case "P": return this.parse_program();
+            case "DL": return this.parse_DL(thisNode);
+            case "D": return this.parse_D(thisNode);
+            case "TS": return this.parse_TS(thisNode);
+            case "VDFD": return this.parse_VDFD(thisNode);
+            case "VD": return this.parse_VD(thisNode);
+            case "FD": return this.parse_FD(thisNode);
+            case "PARS": return this.parse_PARS(thisNode);
+            case "VPAR": return this.parse_VPAR(thisNode);
+            case "PL": return this.parse_PL(thisNode);
+            case "BRCK": return this.parse_BRCK(thisNode);
+            case "CS": return this.parse_CS(thisNode);
+            case "SL": return this.parse_SL(thisNode);
+            case "S": return this.parse_S(thisNode);
+            case "ES": return this.parse_ES(thisNode);
+            case "SS": return this.parse_SS(thisNode);
+            case "IS": return this.parse_IS(thisNode);
+            case "RS": return this.parse_RS(thisNode);
+            case "RVAL": return this.parse_RVAL(thisNode);
+            case "SWS": return this.parse_SWS(thisNode);
+            case "CASS": return this.parse_CASS(thisNode);
+            case "DS": return this.parse_DS(thisNode);
+            case "E": return this.parse_E(thisNode);
+            case "EID": return this.parse_EID(thisNode);
+            case "EID1": return this.parse_EID1(thisNode);
+            case "SE1": return this.parse_SE1(thisNode);
+            case "AE": return this.parse_AE(thisNode);
+            case "AE1": return this.parse_AE1(thisNode);
+            case "A": return this.parse_A(thisNode);
+            case "R": return this.parse_R(thisNode);
+            case "T": return this.parse_T(thisNode);
+            case "T1": return this.parse_T1(thisNode);
+            case "SF": return this.parse_SF(thisNode);
+            case "SF1": return this.parse_SF1(thisNode);
+            case "F": return this.parse_F(thisNode);
+            case "F1": return this.parse_F1(thisNode);
+            case "VC": return this.parse_VC(thisNode);
+            case "VC1": return this.parse_VC1(thisNode);
+            case "VC2": return this.parse_VC2(thisNode);
+            case "ARGS": return this.parse_ARGS(thisNode);
+            case "ARL": return this.parse_ARL(thisNode);
+            case "ARL1": return this.parse_ARL1(thisNode);
+            default:
+                return true;
+
         }
-
-        handleMissingTerminalError(Token.Type.EOF);
-        this.parseTreeRoot.addChild(new TreeNode("eof"));
-
-        return true;
     }
 
-    private boolean parse_declarationList(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("DL");
-        parNode.addChild(thisNode);
-
-        if(isAllowedToEnterNT("DL1") || handleWrongNonTerminalError("DL1"))
-            parse_declarationList_1(thisNode);
+    private void nnn(String nextNT, TreeNode thisNode) throws Exception {
+        if(isAllowedToEnterNT(nextNT) || handleWrongNonTerminalError(nextNT))
+            callParseFunction(nextNT, thisNode);
         else {
-            TreeNode child = new TreeNode("DL1");
+            TreeNode child = new TreeNode(nextNT);
             child.addChild(new TreeNode("ε"));
             thisNode.addChild(child);
         }
+    }
+
+    private void ttt(Token.Type terminalType, TreeNode thisNode) throws Exception {
+        handleMissingTerminalError(terminalType);
+        thisNode.addChild(new TreeNode(terminalType.getText()));
+    }
+
+
+
+
+    public boolean parse_program() throws Exception {
+        nnn("DL", this.parseTreeRoot);
+        ttt(Token.Type.EOF, this.parseTreeRoot);
 
         return true;
     }
 
-    private boolean parse_declarationList_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("DL1");
+    private boolean parse_DL(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("DL");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToEnterNT("D");
-        boolean enter2 = isAllowedToPassEPSILON("DL1");
+        boolean enter2 = isAllowedToPassEPSILON("DL");
 
         if(enter1) {
-            if(isAllowedToEnterNT("D") || handleWrongNonTerminalError("D"))
-                parse_declaration(thisNode);
-            else {
-                TreeNode child = new TreeNode("D");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("DL1") || handleWrongNonTerminalError("DL1"))
-                parse_declarationList_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("DL1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }
-        else if(enter2) {
+            nnn("D", thisNode);
+            nnn("DL", thisNode);
+        }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
         }
@@ -237,100 +353,18 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_declaration(TreeNode parNode) throws Exception {
+    private boolean parse_D(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("D");
         parNode.addChild(thisNode);
 
-        if(isAllowedToEnterNT("TS") || handleWrongNonTerminalError("TS"))
-            parse_typeSpecifier(thisNode);
-        else {
-            TreeNode child = new TreeNode("TS");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.ID);
-        thisNode.addChild(new TreeNode("id"));
-
-        if(isAllowedToEnterNT("VDFD") || handleWrongNonTerminalError("VDFD"))
-            parse_varfunDeclaration(thisNode);
-        else {
-            TreeNode child = new TreeNode("VDFD");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
+        nnn("TS", thisNode);
+        ttt(Token.Type.ID, thisNode);
+        nnn("VDFD", thisNode);
 
         return true;
     }
 
-    private boolean parse_varfunDeclaration(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("VDFD");
-        parNode.addChild(thisNode);
-
-        boolean enter1 = isAllowedToEnterNT("VD");
-        boolean enter2 = isAllowedToEnterNT("FD");
-
-        if(enter1) {
-            if(isAllowedToEnterNT("VD") || handleWrongNonTerminalError("VD"))
-                parse_varDeclaration(thisNode);
-            else {
-                TreeNode child = new TreeNode("VD");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }else if(enter2) {
-            if(isAllowedToEnterNT("FD") || handleWrongNonTerminalError("FD"))
-                parse_funDeclaration(thisNode);
-            else {
-                TreeNode child = new TreeNode("FD");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }
-
-        return true;
-    }
-
-    private boolean parse_varDeclaration(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("VD");
-        parNode.addChild(thisNode);
-
-        if(isAllowedToEnterNT("VD1") || handleWrongNonTerminalError("VD1"))
-            parse_varDeclaration_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("VD1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_varDeclaration_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("VD1");
-        parNode.addChild(thisNode);
-
-        boolean enter1 = isAllowedToConsumeT(Token.Type.SEMICOLON);
-        boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
-
-        if(enter1) {
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
-        }else if(enter2) {
-            handleMissingTerminalError(Token.Type.OPEN_BRACKETS);
-            thisNode.addChild(new TreeNode("["));
-            handleMissingTerminalError(Token.Type.INT_CONST);
-            thisNode.addChild(new TreeNode("num"));
-            handleMissingTerminalError(Token.Type.CLOSE_BRACKETS);
-            thisNode.addChild(new TreeNode("]"));
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
-        }
-
-        return true;
-    }
-
-    private boolean parse_typeSpecifier(TreeNode parNode) throws Exception {
+    private boolean parse_TS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("TS");
         parNode.addChild(thisNode);
 
@@ -338,117 +372,92 @@ public class Parser {
         boolean enter2 = isAllowedToConsumeT(Token.Type.VOID);
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.INT);
-            thisNode.addChild(new TreeNode("int"));
+            ttt(Token.Type.INT, thisNode);
         }else if(enter2) {
-            handleMissingTerminalError(Token.Type.VOID);
-            thisNode.addChild(new TreeNode("void"));
+            ttt(Token.Type.VOID, thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_funDeclaration(TreeNode parNode) throws Exception {
+    private boolean parse_VDFD(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("VDFD");
+        parNode.addChild(thisNode);
+
+        boolean enter1 = isAllowedToEnterNT("VD");
+        boolean enter2 = isAllowedToEnterNT("FD");
+
+        if(enter1) {
+            nnn("VD", thisNode);
+        }else if(enter2) {
+            nnn("FD", thisNode);
+        }
+        return true;
+    }
+
+    private boolean parse_VD(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("VD");
+        parNode.addChild(thisNode);
+
+        boolean enter1 = isAllowedToConsumeT(Token.Type.SEMICOLON);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
+
+        if(enter1) {
+            ttt(Token.Type.SEMICOLON, thisNode);
+        }else if(enter2) {
+            ttt(Token.Type.OPEN_BRACKETS, thisNode);
+            ttt(Token.Type.NUM, thisNode);
+            ttt(Token.Type.CLOSE_BRACKETS, thisNode);
+            ttt(Token.Type.SEMICOLON, thisNode);
+        }
+
+        return true;
+    }
+
+    private boolean parse_FD(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("FD");
         parNode.addChild(thisNode);
 
-        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-        thisNode.addChild(new TreeNode("("));
-
-        if(isAllowedToEnterNT("PAS") || handleWrongNonTerminalError("PAS"))
-            parse_params(thisNode);
-        else {
-            TreeNode child = new TreeNode("PAS");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-        thisNode.addChild(new TreeNode(")"));
-
-        if(isAllowedToEnterNT("CS") || handleWrongNonTerminalError("CS"))
-            parse_compoundStmt(thisNode);
-        else {
-            TreeNode child = new TreeNode("CS");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
+        ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+        nnn("PARS", thisNode);
+        ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        nnn("CS", thisNode);
 
         return true;
     }
 
-    private boolean parse_params(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("PAS");
+    private boolean parse_PARS(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("PARS");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.INT);
         boolean enter2 = isAllowedToConsumeT(Token.Type.VOID);
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.INT);
-            thisNode.addChild(new TreeNode("int"));
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("PA1") || handleWrongNonTerminalError("PA1"))
-                parse_param_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("PA1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("PL1") || handleWrongNonTerminalError("PL1"))
-                parse_paramList_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("PL1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            ttt(Token.Type.INT, thisNode);
+            ttt(Token.Type.ID, thisNode);
+            nnn("BRCK", thisNode);
+            nnn("PL", thisNode);
 
         }else if(enter2) {
-            handleMissingTerminalError(Token.Type.VOID);
-            thisNode.addChild(new TreeNode("void"));
-
-            if(isAllowedToEnterNT("PAS1") || handleWrongNonTerminalError("PAS1"))
-                parse_params_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("PAS1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            ttt(Token.Type.VOID, thisNode);
+            nnn("VPAR", thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_params_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("PAS1");
+    private boolean parse_VPAR(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("VPAR");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.ID);
-        boolean enter2 = isAllowedToPassEPSILON("PAS1");
+        boolean enter2 = isAllowedToPassEPSILON("VPAR");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("PA1") || handleWrongNonTerminalError("PA1"))
-                parse_param_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("PA1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("PL1") || handleWrongNonTerminalError("PL1"))
-                parse_paramList_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("PL1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.ID, thisNode);
+            nnn("BRCK", thisNode);
+            nnn("PL", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -457,33 +466,19 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_paramList_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("PL1");
+    private boolean parse_PL(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("PL");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.COMMA);
-        boolean enter2 = isAllowedToPassEPSILON("PL1");
+        boolean enter2 = isAllowedToPassEPSILON("PL");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.COMMA);
-            thisNode.addChild(new TreeNode(","));
-
-            if(isAllowedToEnterNT("PA") || handleWrongNonTerminalError("PA"))
-                parse_param(thisNode);
-            else {
-                TreeNode child = new TreeNode("PA");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("PL1") || handleWrongNonTerminalError("PL1"))
-                parse_paramList_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("PL1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.COMMA, thisNode);
+            nnn("TS", thisNode);
+            ttt(Token.Type.ID, thisNode);
+            nnn("BRCK", thisNode);
+            nnn("PL", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -492,44 +487,16 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_param(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("PA");
-        parNode.addChild(thisNode);
-
-        if(isAllowedToEnterNT("TS") || handleWrongNonTerminalError("TS"))
-            parse_typeSpecifier(thisNode);
-        else {
-            TreeNode child = new TreeNode("TS");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.ID);
-        thisNode.addChild(new TreeNode("id"));
-
-        if(isAllowedToEnterNT("PA1") || handleWrongNonTerminalError("PA1"))
-            parse_param_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("PA1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_param_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("PA1");
+    private boolean parse_BRCK(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("BRCK");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
-        boolean enter2 = isAllowedToPassEPSILON("PA1");
+        boolean enter2 = isAllowedToPassEPSILON("BRCK");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.OPEN_BRACKETS);
-            thisNode.addChild(new TreeNode("["));
-            handleMissingTerminalError(Token.Type.CLOSE_BRACKETS);
-            thisNode.addChild(new TreeNode("]"));
+            ttt(Token.Type.OPEN_BRACKETS, thisNode);
+            ttt(Token.Type.CLOSE_BRACKETS, thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -538,74 +505,28 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_compoundStmt(TreeNode parNode) throws Exception {
+    private boolean parse_CS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("CS");
         parNode.addChild(thisNode);
 
-        handleMissingTerminalError(Token.Type.OPEN_BRACES);
-        thisNode.addChild(new TreeNode("{"));
-
-        if(isAllowedToEnterNT("DL") || handleWrongNonTerminalError("DL"))
-            parse_declarationList(thisNode);
-        else {
-            TreeNode child = new TreeNode("DL");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        if(isAllowedToEnterNT("SL") || handleWrongNonTerminalError("SL"))
-            parse_statementList(thisNode);
-        else {
-            TreeNode child = new TreeNode("SL");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.CLOSE_BRACES);
-        thisNode.addChild(new TreeNode("}"));
+        ttt(Token.Type.OPEN_BRACES, thisNode);
+        nnn("DL", thisNode);
+        nnn("SL", thisNode);
+        ttt(Token.Type.CLOSE_BRACES, thisNode);
 
         return true;
     }
 
-    private boolean parse_statementList(TreeNode parNode) throws Exception {
+    private boolean parse_SL(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("SL");
         parNode.addChild(thisNode);
 
-        if(isAllowedToEnterNT("SL1") || handleWrongNonTerminalError("SL1"))
-            parse_statementList_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("SL1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_statementList_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("SL1");
-        parNode.addChild(thisNode);
-
         boolean enter1 = isAllowedToEnterNT("S");
-        boolean enter2 = isAllowedToPassEPSILON("SL1");
+        boolean enter2 = isAllowedToPassEPSILON("SL");
 
         if(enter1) {
-            if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
-                parse_statement(thisNode);
-            else {
-                TreeNode child = new TreeNode("S");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("SL1") || handleWrongNonTerminalError("SL1"))
-                parse_statementList_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("SL1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            nnn("S", thisNode);
+            nnn("SL", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -614,7 +535,7 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_statement(TreeNode parNode) throws Exception {
+    private boolean parse_S(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("S");
         parNode.addChild(thisNode);
 
@@ -626,59 +547,23 @@ public class Parser {
         boolean enter6 = isAllowedToEnterNT("SWS");
 
         if(enter1) {
-            if (isAllowedToEnterNT("ES") || handleWrongNonTerminalError("ES"))
-                parse_expressionStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("ES");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("ES", thisNode);
         }else if(enter2) {
-            if (isAllowedToEnterNT("CS") || handleWrongNonTerminalError("CS"))
-                parse_compoundStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("CS");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("CS", thisNode);
         }else if(enter3) {
-            if (isAllowedToEnterNT("SS") || handleWrongNonTerminalError("SS"))
-                parse_selectionStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("SS");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("SS", thisNode);
         }else if(enter4) {
-            if (isAllowedToEnterNT("IS") || handleWrongNonTerminalError("IS"))
-                parse_iterationStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("IS");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("IS", thisNode);
         }else if(enter5) {
-            if (isAllowedToEnterNT("RS") || handleWrongNonTerminalError("RS"))
-                parse_returnStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("RS");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("RS", thisNode);
         }else if(enter6) {
-            if (isAllowedToEnterNT("SWS") || handleWrongNonTerminalError("SWS"))
-                parse_switchStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("SWS");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("SWS", thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_expressionStmt(TreeNode parNode) throws Exception {
+    private boolean parse_ES(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("ES");
         parNode.addChild(thisNode);
 
@@ -688,236 +573,105 @@ public class Parser {
         boolean enter4 = isAllowedToConsumeT(Token.Type.SEMICOLON);
 
         if(enter1) {
-            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-                parse_expression(thisNode);
-            else {
-                TreeNode child = new TreeNode("E");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
+            nnn("E", thisNode);
+            ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
-            handleMissingTerminalError(Token.Type.CONTINUE);
-            thisNode.addChild(new TreeNode("continue"));
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
+            ttt(Token.Type.CONTINUE, thisNode);
+            ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter3) {
-            handleMissingTerminalError(Token.Type.BREAK);
-            thisNode.addChild(new TreeNode("break"));
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
+            ttt(Token.Type.BREAK, thisNode);
+            ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter4) {
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
+            ttt(Token.Type.SEMICOLON, thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_selectionStmt(TreeNode parNode) throws Exception {
+    private boolean parse_SS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("SS");
         parNode.addChild(thisNode);
 
-        handleMissingTerminalError(Token.Type.IF);
-        thisNode.addChild(new TreeNode("if"));
-        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-        thisNode.addChild(new TreeNode("("));
-
-        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-            parse_expression(thisNode);
-        else {
-            TreeNode child = new TreeNode("E");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-        thisNode.addChild(new TreeNode(")"));
-
-        if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
-            parse_statement(thisNode);
-        else {
-            TreeNode child = new TreeNode("S");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.ELSE);
-        thisNode.addChild(new TreeNode("else"));
-
-        if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
-            parse_statement(thisNode);
-        else {
-            TreeNode child = new TreeNode("S");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
+        ttt(Token.Type.IF, thisNode);
+        ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+        nnn("E", thisNode);
+        ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        nnn("S", thisNode);
+        ttt(Token.Type.ELSE, thisNode);
+        nnn("S", thisNode);
 
         return true;
     }
 
-    private boolean parse_iterationStmt(TreeNode parNode) throws Exception {
+    private boolean parse_IS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("IS");
         parNode.addChild(thisNode);
 
-        handleMissingTerminalError(Token.Type.WHILE);
-        thisNode.addChild(new TreeNode("while"));
-
-        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-        thisNode.addChild(new TreeNode("("));
-
-        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-            parse_expression(thisNode);
-        else {
-            TreeNode child = new TreeNode("E");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-        thisNode.addChild(new TreeNode(")"));
-
-        if(isAllowedToEnterNT("S") || handleWrongNonTerminalError("S"))
-            parse_statement(thisNode);
-        else {
-            TreeNode child = new TreeNode("S");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
+        ttt(Token.Type.WHILE, thisNode);
+        ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+        nnn("E", thisNode);
+        ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        nnn("S", thisNode);
 
         return true;
     }
 
-    private boolean parse_returnStmt(TreeNode parNode) throws Exception {
+    private boolean parse_RS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("RS");
         parNode.addChild(thisNode);
 
-        handleMissingTerminalError(Token.Type.RETURN);
-        thisNode.addChild(new TreeNode("return"));
-
-        if(isAllowedToEnterNT("RS1") | handleWrongNonTerminalError("RS1"))
-            parse_returnStmt_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("RS1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
+        ttt(Token.Type.RETURN, thisNode);
+        nnn("RVAL", thisNode);
 
         return true;
     }
 
-    private boolean parse_returnStmt_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("RS1");
+    private boolean parse_RVAL(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("RVAL");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.SEMICOLON);
         boolean enter2 = isAllowedToEnterNT("E");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
+            ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
-            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-                parse_expression(thisNode);
-            else {
-                TreeNode child = new TreeNode("E");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            handleMissingTerminalError(Token.Type.SEMICOLON);
-            thisNode.addChild(new TreeNode(";"));
+            nnn("E", thisNode);
+            ttt(Token.Type.SEMICOLON, thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_switchStmt(TreeNode parNode) throws Exception {
+    private boolean parse_SWS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("SWS");
         parNode.addChild(thisNode);
 
-        handleMissingTerminalError(Token.Type.SWITCH);
-        thisNode.addChild(new TreeNode("switch"));
-
-        handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-        thisNode.addChild(new TreeNode("("));
-
-        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-            parse_expression(thisNode);
-        else {
-            TreeNode child = new TreeNode("E");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-        thisNode.addChild(new TreeNode(")"));
-
-        handleMissingTerminalError(Token.Type.OPEN_BRACES);
-        thisNode.addChild(new TreeNode("{"));
-
-        if(isAllowedToEnterNT("CASS") || handleWrongNonTerminalError("CASS"))
-            parse_caseStmts(thisNode);
-        else {
-            TreeNode child = new TreeNode("CASS");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        if(isAllowedToEnterNT("DS") || handleWrongNonTerminalError("DS"))
-            parse_defaultStmt(thisNode);
-        else {
-            TreeNode child = new TreeNode("DS");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        handleMissingTerminalError(Token.Type.CLOSE_BRACES);
-        thisNode.addChild(new TreeNode("}"));
+        ttt(Token.Type.SWITCH, thisNode);
+        ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+        nnn("E", thisNode);
+        ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        ttt(Token.Type.OPEN_BRACES, thisNode);
+        nnn("CASS", thisNode);
+        nnn("DS", thisNode);
+        ttt(Token.Type.CLOSE_BRACES, thisNode);
 
         return true;
     }
 
-    private boolean parse_caseStmts(TreeNode parNode) throws Exception {
+    private boolean parse_CASS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("CASS");
         parNode.addChild(thisNode);
 
-        if(isAllowedToEnterNT("CASS1") || handleWrongNonTerminalError("CASS1"))
-            parse_caseStmts_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("CASS1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_caseStmts_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("CASS1");
-        parNode.addChild(thisNode);
-
-        boolean enter1 = isAllowedToEnterNT("CAS");
-        boolean enter2 = isAllowedToPassEPSILON("CASS1");
+        boolean enter1 = isAllowedToConsumeT(Token.Type.CASE);
+        boolean enter2 = isAllowedToPassEPSILON("CASS");
 
         if(enter1) {
-            if(isAllowedToEnterNT("CAS") || handleWrongNonTerminalError("CAS"))
-                parse_caseStmt(thisNode);
-            else {
-                TreeNode child = new TreeNode("CAS");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("CASS1") || handleWrongNonTerminalError("CASS1"))
-                parse_caseStmts_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("CASS1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.CASE, thisNode);
+            ttt(Token.Type.NUM, thisNode);
+            ttt(Token.Type.COLON, thisNode);
+            nnn("SL", thisNode);
+            nnn("CASS", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -926,32 +680,7 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_caseStmt(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("CAS");
-        parNode.addChild(thisNode);
-
-        handleMissingTerminalError(Token.Type.CASE);
-        thisNode.addChild(new TreeNode("case"));
-
-        handleMissingTerminalError(Token.Type.INT_CONST);
-        thisNode.addChild(new TreeNode("num"));
-
-        handleMissingTerminalError(Token.Type.COLON);
-        thisNode.addChild(new TreeNode(":"));
-
-
-        if(isAllowedToEnterNT("SL") || handleWrongNonTerminalError("SL"))
-            parse_statementList(thisNode);
-        else {
-            TreeNode child = new TreeNode("SL");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_defaultStmt(TreeNode parNode) throws Exception {
+    private boolean parse_DS(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("DS");
         parNode.addChild(thisNode);
 
@@ -959,21 +688,9 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("DS");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.DEFAULT);
-            thisNode.addChild(new TreeNode("default"));
-
-            handleMissingTerminalError(Token.Type.COLON);
-            thisNode.addChild(new TreeNode(":"));
-
-
-            if(isAllowedToEnterNT("SL") || handleWrongNonTerminalError("SL"))
-                parse_statementList(thisNode);
-            else {
-                TreeNode child = new TreeNode("SL");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.DEFAULT, thisNode);
+            ttt(Token.Type.COLON, thisNode);
+            nnn("SL", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -982,208 +699,72 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_expression(TreeNode parNode) throws Exception {
+    private boolean parse_E(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("E");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.ID);
-        boolean enter2 = isAllowedToEnterNT("SE2");
+        boolean enter2 = isAllowedToEnterNT("SF1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("E2") || handleWrongNonTerminalError("E2"))
-                parse_expression_2(thisNode);
-            else {
-                TreeNode child = new TreeNode("E2");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.ID, thisNode);
+            nnn("EID", thisNode);
         }else if(enter2) {
-            if(isAllowedToEnterNT("SE2") || handleWrongNonTerminalError("SE2"))
-                parse_simpleExpression_2(thisNode);
-            else {
-                TreeNode child = new TreeNode("SE2");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("SF1", thisNode);
+            nnn("T1", thisNode);
+            nnn("AE1", thisNode);
+            nnn("SE1", thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_expression_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("E1");
+    private boolean parse_EID(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("EID");
+        parNode.addChild(thisNode);
+
+        boolean enter1 = isAllowedToConsumeT(Token.Type.ASSIGN);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
+        boolean enter3 = isAllowedToEnterNT("VC2");
+
+        if(enter1) {
+            ttt(Token.Type.ASSIGN, thisNode);
+            nnn("E", thisNode);
+        }else if(enter2) {
+            ttt(Token.Type.OPEN_BRACKETS, thisNode);
+            nnn("E", thisNode);
+            ttt(Token.Type.CLOSE_BRACKETS, thisNode);
+            nnn("EID1", thisNode);
+        }else if(enter3) {
+            nnn("VC2", thisNode);
+            nnn("T1", thisNode);
+            nnn("AE1", thisNode);
+            nnn("SE1", thisNode);
+        }
+
+        return true;
+    }
+
+    private boolean parse_EID1(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("EID1");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.ASSIGN);
         boolean enter2 = isAllowedToEnterNT("T1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.ASSIGN);
-            thisNode.addChild(new TreeNode("="));
-
-            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-                parse_expression(thisNode);
-            else {
-                TreeNode child = new TreeNode("E");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.ASSIGN, thisNode);
+            nnn("E", thisNode);
         }else if(enter2) {
-            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
-                parse_term_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("T1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
-                parse_additiveExpression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("AE1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("SE1") || handleWrongNonTerminalError("SE1"))
-                parse_simpleExpression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("SE1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("T1", thisNode);
+            nnn("AE1", thisNode);
+            nnn("SE1", thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_expression_2(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("E2");
-        parNode.addChild(thisNode);
-
-        boolean enter1 = isAllowedToEnterNT("V1");
-        boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
-
-        if(enter1) {
-            if(isAllowedToEnterNT("V1") || handleWrongNonTerminalError("V1"))
-                parse_var_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("V1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("E1") || handleWrongNonTerminalError("E1"))
-                parse_expression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("E1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-        }else if(enter2) {
-            handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-            thisNode.addChild(new TreeNode("("));
-
-            if(isAllowedToEnterNT("AR") || handleWrongNonTerminalError("AR"))
-                parse_args(thisNode);
-            else {
-                TreeNode child = new TreeNode("AR");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-            thisNode.addChild(new TreeNode(")"));
-
-
-            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
-                parse_term_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("T1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
-                parse_additiveExpression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("AE1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("SE1") || handleWrongNonTerminalError("SE1"))
-                parse_simpleExpression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("SE1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }
-
-        return true;
-    }
-
-    private boolean parse_var_1(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("V1");
-        parNode.addChild(thisNode);
-
-        boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
-        boolean enter2 = isAllowedToPassEPSILON("V1");
-
-        if(enter1) {
-            handleMissingTerminalError(Token.Type.OPEN_BRACKETS);
-            thisNode.addChild(new TreeNode("["));
-
-            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-                parse_expression(thisNode);
-            else {
-                TreeNode child = new TreeNode("E");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            handleMissingTerminalError(Token.Type.CLOSE_BRACKETS);
-            thisNode.addChild(new TreeNode("]"));
-
-        }else if(enter2) {
-            thisNode.addChild(new TreeNode("ε"));
-            return true;
-        }
-
-        return true;
-    }
-
-    private boolean parse_simpleExpression_2(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("SE2");
-        parNode.addChild(thisNode);
-
-        if(isAllowedToEnterNT("AE2") || handleWrongNonTerminalError("AE2"))
-            parse_additiveExpression_2(thisNode);
-        else {
-            TreeNode child = new TreeNode("AE2");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        if(isAllowedToEnterNT("SE1") || handleWrongNonTerminalError("SE1"))
-            parse_simpleExpression_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("SE1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_simpleExpression_1(TreeNode parNode) throws Exception {
+    private boolean parse_SE1(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("SE1");
         parNode.addChild(thisNode);
 
@@ -1191,22 +772,8 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("SE1");
 
         if(enter1) {
-            if(isAllowedToEnterNT("R") || handleWrongNonTerminalError("R"))
-                parse_relop(thisNode);
-            else {
-                TreeNode child = new TreeNode("R");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("AE") || handleWrongNonTerminalError("AE"))
-                parse_additiveExpression(thisNode);
-            else {
-                TreeNode child = new TreeNode("AE");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            nnn("R", thisNode);
+            nnn("AE", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1215,95 +782,17 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_relop(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("R");
-        parNode.addChild(thisNode);
-
-        boolean enter1 = isAllowedToConsumeT(Token.Type.LESS_THAN);
-        boolean enter2 = isAllowedToConsumeT(Token.Type.EQ);
-
-        if(enter1) {
-            handleMissingTerminalError(Token.Type.LESS_THAN);
-            thisNode.addChild(new TreeNode("<"));
-        }else if(enter2) {
-            handleMissingTerminalError(Token.Type.EQ);
-            thisNode.addChild(new TreeNode("=="));
-        }
-
-        return true;
-    }
-
-    private boolean parse_additiveExpression(TreeNode parNode) throws Exception {
+    private boolean parse_AE(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("AE");
         parNode.addChild(thisNode);
 
-        boolean enter1 = isAllowedToEnterNT("AE2");
-        boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
-
-        if(enter1) {
-            if(isAllowedToEnterNT("AE2") || handleWrongNonTerminalError("AE2"))
-                parse_additiveExpression_2(thisNode);
-            else {
-                TreeNode child = new TreeNode("AE2");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }else if(enter2) {
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("VC") || handleWrongNonTerminalError("VC"))
-                parse_varcall(thisNode);
-            else {
-                TreeNode child = new TreeNode("VC");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
-                parse_term_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("T1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
-                parse_additiveExpression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("AE1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }
+        nnn("T", thisNode);
+        nnn("AE1", thisNode);
 
         return true;
     }
 
-    private boolean parse_additiveExpression_2(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("AE2");
-        parNode.addChild(thisNode);
-
-        if(isAllowedToEnterNT("T2") || handleWrongNonTerminalError("T2"))
-            parse_term_2(thisNode);
-        else {
-            TreeNode child = new TreeNode("T2");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
-            parse_additiveExpression_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("AE1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_additiveExpression_1(TreeNode parNode) throws Exception {
+    private boolean parse_AE1(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("AE1");
         parNode.addChild(thisNode);
 
@@ -1311,30 +800,8 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("AE1");
 
         if(enter1) {
-            if(isAllowedToEnterNT("A") || handleWrongNonTerminalError("A"))
-                parse_addop(thisNode);
-            else {
-                TreeNode child = new TreeNode("A");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("T") || handleWrongNonTerminalError("T"))
-                parse_term(thisNode);
-            else {
-                TreeNode child = new TreeNode("T");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("AE1") || handleWrongNonTerminalError("AE1"))
-                parse_additiveExpression_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("AE1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            nnn("A", thisNode);
+            nnn("T", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1343,7 +810,7 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_addop(TreeNode parNode) throws Exception {
+    private boolean parse_A(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("A");
         parNode.addChild(thisNode);
 
@@ -1351,79 +818,41 @@ public class Parser {
         boolean enter2 = isAllowedToConsumeT(Token.Type.MINUS);
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.PLUS);
-            thisNode.addChild(new TreeNode("+"));
+            ttt(Token.Type.PLUS, thisNode);
         }else if(enter2) {
-            handleMissingTerminalError(Token.Type.MINUS);
-            thisNode.addChild(new TreeNode("-"));
+            ttt(Token.Type.MINUS, thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_term(TreeNode parNode) throws Exception {
+    private boolean parse_R(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("R");
+        parNode.addChild(thisNode);
+
+        boolean enter1 = isAllowedToConsumeT(Token.Type.LESS_THAN);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.EQ);
+
+        if(enter1) {
+            ttt(Token.Type.LESS_THAN, thisNode);
+        }else if(enter2) {
+            ttt(Token.Type.EQ, thisNode);
+        }
+
+        return true;
+    }
+
+    private boolean parse_T(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("T");
         parNode.addChild(thisNode);
 
-        boolean enter1 = isAllowedToEnterNT("T2");
-        boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
-
-        if(enter1) {
-            if(isAllowedToEnterNT("T2") || handleWrongNonTerminalError("T2"))
-                parse_term_2(thisNode);
-            else {
-                TreeNode child = new TreeNode("T2");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }else if(enter2) {
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("VC") || handleWrongNonTerminalError("VC"))
-                parse_varcall(thisNode);
-            else {
-                TreeNode child = new TreeNode("VC");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
-                parse_term_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("T1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }
+        nnn("SF", thisNode);
+        nnn("T1", thisNode);
 
         return true;
     }
 
-    private boolean parse_term_2(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("T2");
-        parNode.addChild(thisNode);
-
-        if(isAllowedToEnterNT("SF1") || handleWrongNonTerminalError("SF1"))
-            parse_signedFactor_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("SF1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("T1"))
-            parse_term_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("T1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        return true;
-    }
-
-    private boolean parse_term_1(TreeNode parNode) throws Exception {
+    private boolean parse_T1(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("T1");
         parNode.addChild(thisNode);
 
@@ -1431,25 +860,8 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("T1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.TIMES);
-            thisNode.addChild(new TreeNode("*"));
-
-            if(isAllowedToEnterNT("SF") || handleWrongNonTerminalError("SF"))
-                parse_signedFactor(thisNode);
-            else {
-                TreeNode child = new TreeNode("SF");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("T1") || handleWrongNonTerminalError("SF"))
-                parse_term_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("T1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.TIMES, thisNode);
+            nnn("SF", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1458,39 +870,23 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_signedFactor(TreeNode parNode) throws Exception {
+    private boolean parse_SF(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("SF");
         parNode.addChild(thisNode);
 
-        boolean enter1 = isAllowedToConsumeT(Token.Type.ID);
+        boolean enter1 = isAllowedToEnterNT("VC");
         boolean enter2 = isAllowedToEnterNT("SF1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("VC") | handleWrongNonTerminalError("VC"))
-                parse_varcall(thisNode);
-            else {
-                TreeNode child = new TreeNode("VC");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            nnn("VC", thisNode);
         }else if(enter2) {
-            if(isAllowedToEnterNT("SF1") || handleWrongNonTerminalError("SF1"))
-                parse_signedFactor_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("SF1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("SF1", thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_signedFactor_1(TreeNode parNode) throws Exception {
+    private boolean parse_SF1(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("SF1");
         parNode.addChild(thisNode);
 
@@ -1499,152 +895,119 @@ public class Parser {
         boolean enter3 = isAllowedToEnterNT("F1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.PLUS);
-            thisNode.addChild(new TreeNode("+"));
-
-            if(isAllowedToEnterNT("F") || handleWrongNonTerminalError("F"))
-                parse_factor(thisNode);
-            else {
-                TreeNode child = new TreeNode("F");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            ttt(Token.Type.PLUS, thisNode);
+            nnn("F", thisNode);
         }else if(enter2) {
-            handleMissingTerminalError(Token.Type.MINUS);
-            thisNode.addChild(new TreeNode("-"));
-
-            if(isAllowedToEnterNT("F") || handleWrongNonTerminalError("F"))
-                parse_factor(thisNode);
-            else {
-                TreeNode child = new TreeNode("F");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            ttt(Token.Type.MINUS, thisNode);
+            nnn("F", thisNode);
         }else if(enter3) {
-            if(isAllowedToEnterNT("F1") || handleWrongNonTerminalError("F1"))
-                parse_factor_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("F1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("F1", thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_factor(TreeNode parNode) throws Exception {
+    private boolean parse_F(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("F");
         parNode.addChild(thisNode);
 
-        boolean enter1 = isAllowedToEnterNT("F1");
-        boolean enter2 = isAllowedToConsumeT(Token.Type.ID);
+        boolean enter1 = isAllowedToEnterNT("VC");
+        boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
+        boolean enter3 = isAllowedToConsumeT(Token.Type.NUM);
 
         if(enter1) {
-            if(isAllowedToEnterNT("F1") || handleWrongNonTerminalError("F1"))
-                parse_factor_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("F1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-        }else if(enter2) {
-            handleMissingTerminalError(Token.Type.ID);
-            thisNode.addChild(new TreeNode("id"));
-
-            if(isAllowedToEnterNT("VC") || handleWrongNonTerminalError("VC"))
-                parse_varcall(
-                        thisNode);
-            else {
-                TreeNode child = new TreeNode("VC");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("VC", thisNode);
+        } else if(enter2) {
+            ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+            nnn("E", thisNode);
+            ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        } else if(enter3) {
+            ttt(Token.Type.NUM, thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_factor_1(TreeNode parNode) throws Exception {
+    private boolean parse_F1(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("F1");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
-        boolean enter2 = isAllowedToConsumeT(Token.Type.INT_CONST);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.NUM);
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-            thisNode.addChild(new TreeNode("("));
-
-            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-                parse_expression(thisNode);
-            else {
-                TreeNode child = new TreeNode("E");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-            thisNode.addChild(new TreeNode(")"));
-
+            ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+            nnn("E", thisNode);
+            ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
         }else if(enter2) {
-            handleMissingTerminalError(Token.Type.INT_CONST);
-            thisNode.addChild(new TreeNode("num"));
+            ttt(Token.Type.NUM, thisNode);
         }
 
         return true;
     }
 
-    private boolean parse_varcall(TreeNode parNode) throws Exception {
+    private boolean parse_VC(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("VC");
         parNode.addChild(thisNode);
 
-        boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
-        boolean enter2 = isAllowedToEnterNT("V1");
+        ttt(Token.Type.ID, thisNode);
+        nnn("VC1", thisNode);
+
+        return true;
+    }
+
+    private boolean parse_VC1(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("VC1");
+        parNode.addChild(thisNode);
+
+        boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
+        boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
+        boolean enter3 = isAllowedToPassEPSILON("VC1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.OPEN_PARENTHESES);
-            thisNode.addChild(new TreeNode("("));
-
-            if(isAllowedToEnterNT("AR") || handleWrongNonTerminalError("AR"))
-                parse_args(thisNode);
-            else {
-                TreeNode child = new TreeNode("AR");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            handleMissingTerminalError(Token.Type.CLOSE_PARENTHESES);
-            thisNode.addChild(new TreeNode(")"));
-
-        }else if(enter2) {
-            if(isAllowedToEnterNT("V1") || handleWrongNonTerminalError("V1"))
-                parse_var_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("V1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            ttt(Token.Type.OPEN_BRACKETS, thisNode);
+            nnn("E", thisNode);
+            ttt(Token.Type.CLOSE_BRACKETS, thisNode);
+        } else if(enter2) {
+            ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+            nnn("ARGS", thisNode);
+            ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        } else if (enter3) {
+            thisNode.addChild(new TreeNode("ε"));
+            return true;
         }
 
         return true;
     }
 
-    private boolean parse_args(TreeNode parNode) throws Exception {
-        TreeNode thisNode = new TreeNode("AR");
+    private boolean parse_VC2(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("VC2");
+        parNode.addChild(thisNode);
+
+        boolean enter1 = isAllowedToConsumeT(Token.Type.OPEN_PARENTHESES);
+        boolean enter2 = isAllowedToPassEPSILON("VC2");
+
+        if(enter1) {
+            ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+            nnn("ARGS", thisNode);
+            ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        } else if (enter2) {
+            thisNode.addChild(new TreeNode("ε"));
+            return true;
+        }
+
+        return true;
+    }
+
+    private boolean parse_ARGS(TreeNode parNode) throws Exception {
+        TreeNode thisNode = new TreeNode("ARGS");
         parNode.addChild(thisNode);
 
         boolean enter1 = isAllowedToEnterNT("ARL");
-        boolean enter2 = isAllowedToPassEPSILON("AR");
+        boolean enter2 = isAllowedToPassEPSILON("ARGS");
 
         if(enter1) {
-            if(isAllowedToEnterNT("ARL") || handleWrongNonTerminalError("ARL"))
-                parse_argList(thisNode);
-            else {
-                TreeNode child = new TreeNode("ARL");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
+            nnn("ARL", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1653,30 +1016,17 @@ public class Parser {
         return true;
     }
 
-    private boolean parse_argList(TreeNode parNode) throws Exception {
+    private boolean parse_ARL(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("ARL");
         parNode.addChild(thisNode);
 
-        if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-            parse_expression(thisNode);
-        else {
-            TreeNode child = new TreeNode("E");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
-
-        if(isAllowedToEnterNT("ARL1") || handleWrongNonTerminalError("ARL1"))
-            parse_argList_1(thisNode);
-        else {
-            TreeNode child = new TreeNode("ARL1");
-            child.addChild(new TreeNode("ε"));
-            thisNode.addChild(child);
-        }
+        nnn("E", thisNode);
+        nnn("ARL1", thisNode);
 
         return true;
     }
 
-    private boolean parse_argList_1(TreeNode parNode) throws Exception {
+    private boolean parse_ARL1(TreeNode parNode) throws Exception {
         TreeNode thisNode = new TreeNode("ARL1");
         parNode.addChild(thisNode);
 
@@ -1684,25 +1034,9 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("ARL1");
 
         if(enter1) {
-            handleMissingTerminalError(Token.Type.COMMA);
-            thisNode.addChild(new TreeNode(","));
-
-            if(isAllowedToEnterNT("E") || handleWrongNonTerminalError("E"))
-                parse_expression(thisNode);
-            else {
-                TreeNode child = new TreeNode("E");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
-            if(isAllowedToEnterNT("ARL1") || handleWrongNonTerminalError("ARL1"))
-                parse_argList_1(thisNode);
-            else {
-                TreeNode child = new TreeNode("ARL1");
-                child.addChild(new TreeNode("ε"));
-                thisNode.addChild(child);
-            }
-
+            ttt(Token.Type.COMMA, thisNode);
+            nnn("E", thisNode);
+            nnn("ARL1", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1714,185 +1048,6 @@ public class Parser {
 
 
 
-
-/////////////////////////////////////////////////////////////////////////////
-
-    /*
-    private Statement parseStatement() {
-        Token first = peek();
-        Token second = peekSecond();
-        if (first.getType() == Token.Type.OPEN_BRACES) {
-            return parseBlock();
-        } else if (first.getType() == Token.Type.WHILE) {
-            return parseWhile();
-        } else if (first.getType() == Token.Type.IF) {
-            return parseIf();
-        } else if (first.getType() == Token.Type.ID && second.getType() == Token.Type.COLON) {
-            return parseDeclaration();
-        } else if (first.getType() == Token.Type.ID && second.getType() == Token.Type.ASSIGN) {
-            return parseAssignment();
-        } else {
-            Expression expression = parseExpr();
-            consume(Token.Type.SEMICOLON);
-            return expression;
-        }
-    }
-
-    private Block parseBlock() {
-        consume(Token.Type.OPEN_BRACES);
-        ArrayList<Statement> statements = new ArrayList<Statement>();
-        while (true) {
-            Token t = peek();
-            if (t.getType() == Token.Type.CLOSE_BRACES) {
-                break;
-            } else {
-                statements.add(parseStatement());
-            }
-        }
-        consume(Token.Type.CLOSE_BRACES);
-        return new Block(statements);
-    }
-
-    private While parseWhile() {
-        consume(Token.Type.WHILE);
-        Expression head = parseExpr();
-        consume(Token.Type.DO);
-        Statement body = parseStatement();
-        return new While(head, body);
-    }
-
-    private If parseIf() {
-        consume(Token.Type.IF);
-        Expression condition = parseExpr();
-        consume(Token.Type.THEN);
-        Statement thenClause = parseStatement();
-        if (peek().getType() == Token.Type.ELSE) {
-            consume(Token.Type.ELSE);
-            Statement elseClause = parseStatement();
-            return new If(condition, thenClause, elseClause);
-        } else {
-            return new If(condition, thenClause);
-        }
-    }
-
-    private Statement parseDeclaration() {
-        String varName = Token.Type.ID.getText();
-        consume(Token.Type.COLON);
-        Type type = parseType();
-        consume(Token.Type.ASSIGN);
-        Expression expression = parseExpr();
-        Statement decl = new Declaration(varName, type, expression);
-        consume(Token.Type.SEMICOLON);
-        return decl;
-    }
-
-    private Statement parseAssignment() {
-        String varName = Token.Type.ID.getText();
-        consume(Token.Type.ASSIGN);
-        Expression expression = parseExpr();
-        Statement assignment = new Assignment(varName, expression);
-        consume(Token.Type.SEMICOLON);
-        return assignment;
-    }
-
-    private Expression parseExpr() {
-        Expression left = parseMathexpr();
-        Token op = peek();
-        switch (op.getType()) {
-            case EQ:
-            case LESS_THAN:
-            case GREATER_THAN:
-                consume();
-                Expression right = parseMathexpr();
-                return new BinaryOperation(left, op.getText(), right);
-            default:
-                return left;
-        }
-    }
-
-    private Expression parseMathexpr() {
-        Expression left = parseTerm();
-        while (true) {
-            Token op = peek();
-            switch (op.getType()) {
-                case PLUS:
-                case MINUS:
-                    consume();
-                    Expression right = parseTerm();
-                    left = new BinaryOperation(left, op.getText(), right);
-                    break;
-                default:
-                    return left;
-            }
-        }
-    }
-
-    private Expression parseTerm() {
-        Expression left = parseFactor();
-        while (true) {
-            Token op = peek();
-            switch (op.getType()) {
-                case TIMES:
-                    consume();
-                    Expression right = parseFactor();
-                    left = new BinaryOperation(left, op.getText(), right);
-                    break;
-                default:
-                    return left;
-            }
-        }
-    }
-
-    private Expression parseFactor() {
-        Token t = consume();
-        if (t.getType() == Token.Type.OPEN_PARENTHESES) {
-            Expression e = parseExpr();
-            consume(Token.Type.CLOSE_PARENTHESES);
-            return e;
-        } else {
-            switch (t.getType()) {
-                case MINUS: return new UnaryOperation("-", parseFactor());
-                case INT: return new IntConstant(Integer.parseInt(t.getText()));
-                case BOOL_CONST: return new BoolConstant(Boolean.parseBoolean(t.getText()));
-                case ID:
-                    if (peek().getType()== Token.Type.OPEN_PARENTHESES) {
-                        String functionName = t.getText();
-                        consume(Token.Type.OPEN_PARENTHESES);
-                        List<Expression> args = parseArguments();
-                        consume(Token.Type.CLOSE_PARENTHESES);
-                        return new FunctionCall(functionName, args);
-                    } else {
-                        return new Variable(t.getText());
-                    }
-                default: return fail("integer or boolean or variable expected instead of '" + t.getText()+ "'");
-
-            }
-        }
-    }
-
-    private List<Expression> parseArguments() {
-        ArrayList<Expression> result = new ArrayList<Expression>();
-        while (peek().getType() != Token.Type.CLOSE_PARENTHESES) {
-            result.add(parseExpr());
-            if (peek().getType() == Token.Type.COMMA) {
-                consume(Token.Type.COMMA);
-            }
-        }
-        return result;
-    }
-
-    private Type parseType() {
-        Token t = consume(Token.Type.ID);
-        switch (t.getText()) {
-            case "int":
-                return IntType.instance;
-            case "bool":
-                return BoolType.instance;
-            default:
-                return fail(t.getText() + " is not a known type");
-        }
-    }
-    */
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1902,12 +1057,8 @@ public class Parser {
 
 
     private Token peek() {
-        return peekAtOffset(0);
-    }
-
-    private Token peekAtOffset(int offset) {
-        if (inputIndex + offset < input.size()) {
-            return input.get(inputIndex + offset);
+        if (inputIndex < input.size()) {
+            return input.get(inputIndex);
         } else {
             return eof;
         }
@@ -1916,6 +1067,7 @@ public class Parser {
     private boolean consume(Token.Type expected) {
         Token actual = peek();
         if (actual.getType() == expected) {
+            input.add(tokenizer.get_next_token());
             inputIndex++;
             return true;
         } else {
@@ -1925,6 +1077,7 @@ public class Parser {
 
     private Token consume() {
         Token tok = peek();
+        input.add(tokenizer.get_next_token());
         inputIndex++;
         return tok;
     }
@@ -1936,3 +1089,37 @@ public class Parser {
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

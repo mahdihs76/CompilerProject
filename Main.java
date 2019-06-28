@@ -11,19 +11,15 @@ public class Main {
 
 
         Tokenizer tokenizer = new Tokenizer(inputProgram);
-        while(true) {
-            Token newToken = tokenizer.get_next_token();
-            if(newToken == null)
-                break;
-        }
-        FileHelper.writeOutput(tokenizer.getResultString(), "tokens.txt");
-        FileHelper.writeOutput(tokenizer.getLexicalErrorsString(), "lexicalErrors.txt");
+        Parser parser = new Parser(tokenizer);
 
-
-        Parser parser = new Parser(tokenizer.getResult());
         try {
             parser.parse_program();
         }catch (Exception ignored){ /* do nothing */ }
+
+        FileHelper.writeOutput(tokenizer.getResultString(), "tokens.txt");
+        FileHelper.writeOutput(tokenizer.getLexicalErrorsString(), "lexicalErrors.txt");
+
         FileHelper.writeOutput(parser.getParsingErrorsString(), "parsingErrors.txt");
         FileHelper.writeOutput(parser.getParseTreeString(), "parseTree.txt");
 

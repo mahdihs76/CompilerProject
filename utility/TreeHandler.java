@@ -39,7 +39,7 @@ public class TreeHandler {
     public static String printNode(TreeNode treeNode) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < treeNode.getDepth(); i++) {
-            sb.append("| ");
+            sb.append("|    ");
         }
         sb.append(treeNode.getLabel());
 

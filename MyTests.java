@@ -1,20 +1,8 @@
 
 import org.junit.Test;
-import parser.Parser;
-import parser.models.Expression;
-import parser.models.Statement;
-import parser.models.expressions.BinaryOperation;
-import parser.models.expressions.FunctionCall;
-import parser.models.expressions.IntConstant;
-import parser.models.expressions.Variable;
-import parser.models.statements.If;
 import tokenizer.Token;
 import tokenizer.Tokenizer;
 
-import java.util.ArrayList;
-import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
 
 /**
  * Created by mahdihs76 on 4/3/19.
@@ -60,7 +48,7 @@ public class MyTests {
     //public void test_parser_1() {
     //    Tokenizer tokenizer = new Tokenizer("x * 5 < y + 10");
     //    tokenizer.get_next_token();
-    //    Expression actual = Parser.parseExpr(tokenizer.getResult());
+    //    Expression actual = Parser.parseExpr(tokenizer.get_result());
     //    //Expression left = new BinaryOperation(new Variable("x"), "*", new IntConstant(5));
     //    //Expression right = new BinaryOperation(new Variable("y"), "+", new IntConstant(10));
     //    //Expression expected = new BinaryOperation(left, "<", right);
@@ -72,7 +60,7 @@ public class MyTests {
     //public void test_parser_2() {
     //    Tokenizer tokenizer = new Tokenizer("if (x > 2) x = 2; else x = 1;");
     //    tokenizer.get_next_token();
-    //    Statement statement = Parser.parseStatement(tokenizer.getResult());
+    //    Statement statement = Parser.parseStatement(tokenizer.get_result());
     //    Expression condition = new BinaryOperation(new Variable("x"), "==", new IntConstant(0));
     //    Statement thenClause = new FunctionCall("print", new Variable("x"));
     //    Statement expected = new If(condition, thenClause);
@@ -98,7 +86,7 @@ public class MyTests {
                 break;
         }
 
-        Parser parser = new Parser(tokenizer.getResult());
+        Parser parser = new Parser(tokenizer.get_result());
 
         try {
             parser.parse_program();
