@@ -7,13 +7,21 @@ import tokenizer.Tokenizer;
 import utility.TreeHandler;
 
 import java.util.ArrayList;
-import semantic_analysis.SemanticAnalyser.ActionType;
+import semantic_analysis.SemanticAnalyser.RoutineType;
 
 
 public class Parser {
 
+    public class IntIndex{
+        public int value;
+        public IntIndex(int val) { this.value = val; }
+        public void inc() { this.value++; }
+        public void dec() { this.value--; }
+    }
+
+
     private ArrayList<Token> input;
-    private int inputIndex;
+    private IntIndex inputIndex;
     private Token eof;
     private StringBuilder parsingErrors;
     private Tokenizer tokenizer;
@@ -30,11 +38,11 @@ public class Parser {
         this.input = new ArrayList<Token>();
         this.input.add(tokenizer.get_next_token());
 
-        this.inputIndex = 0;
+        this.inputIndex = new IntIndex(0);
 
         this.parseTreeRoot = new TreeNode("P");
 
-        this.sa = new SemanticAnalyser();
+        this.sa = new SemanticAnalyser(input, inputIndex);
     }
 
 
@@ -51,7 +59,7 @@ public class Parser {
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
     private void addMissingTerminalError(Token.Type terminalType){
-        parsingErrors.append("line " + input.get(inputIndex - 1).getLine() + " : Syntax Error! Missing " +
+        parsingErrors.append("line " + input.get(inputIndex.value - 1).getLine() + " : Syntax Error! Missing " +
                             terminalType.getText() + "\n");
     }
 
@@ -183,12 +191,12 @@ public class Parser {
             inFollow = currToken.isFollow(nonTerminal);
             haveEpsilon = hasEPSILONInFirst(nonTerminal);
             if(inFirst || inFollow){
-                inputIndex --;
+                inputIndex.dec();
                 break;
             }
 
             if(currToken.getType() == Token.Type.EOF) {
-                this.inputIndex --;
+                this.inputIndex.dec();
                 addUnexpectedEOFError();
                 fail("parsing stopped!");
             }
@@ -198,7 +206,7 @@ public class Parser {
         }
 
         if(inFollow && !haveEpsilon){
-            addWrongNonTerminalError(input.get(inputIndex - 1).getLine(), nonTerminal);
+            addWrongNonTerminalError(input.get(inputIndex.value - 1).getLine(), nonTerminal);
             return false;
         }
         return true;
@@ -227,13 +235,13 @@ public class Parser {
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
     private boolean isAllowedToEnterNT(String NT){
-        boolean r1 = input.get(inputIndex).isFirst(NT);
-        boolean r2 = hasEPSILONInFirst(NT) && input.get(inputIndex).isFollow(NT);
+        boolean r1 = input.get(inputIndex.value).isFirst(NT);
+        boolean r2 = hasEPSILONInFirst(NT) && input.get(inputIndex.value).isFollow(NT);
         return r1 || r2;
     }
 
     private boolean isAllowedToPassEPSILON(String NT){
-        return input.get(inputIndex).isFollow(NT);
+        return input.get(inputIndex.value).isFollow(NT);
     }
 
     private boolean isAllowedToConsumeT(Token.Type terminalType){
@@ -254,7 +262,7 @@ public class Parser {
     }
 
     private int getCurrLine(){
-        return input.get(inputIndex).getLine();
+        return input.get(inputIndex.value).getLine();
     }
 
 
@@ -358,6 +366,7 @@ public class Parser {
         parNode.addChild(thisNode);
 
         nnn("TS", thisNode);
+        sa.executeSemanticRoutine(RoutineType.PID);
         ttt(Token.Type.ID, thisNode);
         nnn("VDFD", thisNode);
 
@@ -372,8 +381,10 @@ public class Parser {
         boolean enter2 = isAllowedToConsumeT(Token.Type.VOID);
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.TSINT);
             ttt(Token.Type.INT, thisNode);
         }else if(enter2) {
+            sa.executeSemanticRoutine(RoutineType.TSVOID);
             ttt(Token.Type.VOID, thisNode);
         }
 
@@ -403,9 +414,11 @@ public class Parser {
         boolean enter2 = isAllowedToConsumeT(Token.Type.OPEN_BRACKETS);
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.VARDEC);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
             ttt(Token.Type.OPEN_BRACKETS, thisNode);
+            sa.executeSemanticRoutine(RoutineType.ARRDEC);
             ttt(Token.Type.NUM, thisNode);
             ttt(Token.Type.CLOSE_BRACKETS, thisNode);
             ttt(Token.Type.SEMICOLON, thisNode);
@@ -418,10 +431,12 @@ public class Parser {
         TreeNode thisNode = new TreeNode("FD");
         parNode.addChild(thisNode);
 
+        sa.executeSemanticRoutine(RoutineType.FUNDEC);
         ttt(Token.Type.OPEN_PARENTHESES, thisNode);
         nnn("PARS", thisNode);
         ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
         nnn("CS", thisNode);
+        sa.executeSemanticRoutine(RoutineType.FUNJPCALLER);
 
         return true;
     }
@@ -435,12 +450,15 @@ public class Parser {
 
         if(enter1) {
             ttt(Token.Type.INT, thisNode);
+            sa.executeSemanticRoutine(RoutineType.TSINT);
+            sa.executeSemanticRoutine(RoutineType.PARID);
             ttt(Token.Type.ID, thisNode);
             nnn("BRCK", thisNode);
             nnn("PL", thisNode);
 
         }else if(enter2) {
             ttt(Token.Type.VOID, thisNode);
+            sa.executeSemanticRoutine(RoutineType.TSVOID);
             nnn("VPAR", thisNode);
         }
 
@@ -457,8 +475,10 @@ public class Parser {
         if(enter1) {
             ttt(Token.Type.ID, thisNode);
             nnn("BRCK", thisNode);
+            sa.executeSemanticRoutine(RoutineType.VOIDPARERR);
             nnn("PL", thisNode);
         }else if(enter2) {
+            sa.executeSemanticRoutine(RoutineType.SINGLEVOIDPAR);
             thisNode.addChild(new TreeNode("ε"));
             return true;
         }
@@ -474,12 +494,15 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("PL");
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.SETPAR);
             ttt(Token.Type.COMMA, thisNode);
             nnn("TS", thisNode);
+            sa.executeSemanticRoutine(RoutineType.PARID);
             ttt(Token.Type.ID, thisNode);
             nnn("BRCK", thisNode);
             nnn("PL", thisNode);
         }else if(enter2) {
+            sa.executeSemanticRoutine(RoutineType.SETPAR);
             thisNode.addChild(new TreeNode("ε"));
             return true;
         }
@@ -495,9 +518,11 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("BRCK");
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.WITHBRCK);
             ttt(Token.Type.OPEN_BRACKETS, thisNode);
             ttt(Token.Type.CLOSE_BRACKETS, thisNode);
         }else if(enter2) {
+            sa.executeSemanticRoutine(RoutineType.WITHOUTBRCK);
             thisNode.addChild(new TreeNode("ε"));
             return true;
         }
@@ -1057,8 +1082,8 @@ public class Parser {
 
 
     private Token peek() {
-        if (inputIndex < input.size()) {
-            return input.get(inputIndex);
+        if (inputIndex.value < input.size()) {
+            return input.get(inputIndex.value);
         } else {
             return eof;
         }
@@ -1068,7 +1093,7 @@ public class Parser {
         Token actual = peek();
         if (actual.getType() == expected) {
             input.add(tokenizer.get_next_token());
-            inputIndex++;
+            inputIndex.inc();
             return true;
         } else {
             return false;
@@ -1078,7 +1103,7 @@ public class Parser {
     private Token consume() {
         Token tok = peek();
         input.add(tokenizer.get_next_token());
-        inputIndex++;
+        inputIndex.inc();
         return tok;
     }
 
