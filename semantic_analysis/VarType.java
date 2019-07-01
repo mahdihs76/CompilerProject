@@ -5,24 +5,22 @@ public enum VarType {
     INTARRAY,
     VOID;
 
+    private int size = 1;
 
-    public static int getValue(VarType varType) {
-        int ret = -1;
-        switch (varType) {
-            case INT: ret = 0;
-            case INTARRAY: ret = 1;
-            case VOID: ret = 2;
-        }
-        return ret;
+    public void setSize(int size) {
+        this.size = size;
+    }
+    public int getSize() {
+        return size;
     }
 
+
     public static VarType valueOf(int value) {
-        VarType ret = null;
         switch (value) {
-            case 0: ret = INT;
-            case 1: ret = INTARRAY;
-            case 2: ret = VOID;
+            case 0: return INT;
+            case 1: return INTARRAY;
+            case 2: return VOID;
+            default: return null;
         }
-        return ret;
     }
 }

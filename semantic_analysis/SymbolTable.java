@@ -8,14 +8,24 @@ public class SymbolTable {
     public class Symbol {
         public String name;
         public int address;
+        public VarType varType;
 
+        public Symbol(String name, int address, VarType varType) {
+            this(name, address);
+            this.varType = varType;
+        }
         public Symbol(String name, int address) {
             this.name = name;
             this.address = address;
         }
 
-        public String getName() { return this.name; }
-        public int getAddress() { return this.address; }
+        public String getName() {
+            return this.name;
+        }
+
+        public int getAddress() {
+            return this.address;
+        }
     }
 
 
@@ -26,49 +36,55 @@ public class SymbolTable {
     }
 
 
+    public int getSize() {
+        return this.symbols.size();
+    }
 
-
-
-
-
-    public int getSize() { return this.symbols.size(); }
-
-    public Integer getAddressByName(String name) {
-        for(Symbol symbol: this.symbols) {
-            if(symbol.name.equals(name))
+    public int getAddressByName(String name) {
+        for (Symbol symbol : this.symbols) {
+            if (symbol.name.equals(name))
                 return symbol.address;
         }
 
-        return null;
+        return -1;
     }
 
     public String getNameByAddress(int address) {
-        for(Symbol symbol: this.symbols) {
-            if(symbol.address == address)
-                return symbol.name;
+        return getByAddress(address).getName();
+    }
+
+
+    public Symbol getByAddress(int address) {
+        for (Symbol symbol : this.symbols) {
+            if (symbol.address == address)
+                return symbol;
         }
 
         return null;
     }
 
     public boolean doesVarExist(String varName) {
-        for(Symbol symbol: this.symbols) {
-            if(symbol.name.equals(varName))
+        for (Symbol symbol : this.symbols) {
+            if (symbol.name.equals(varName))
                 return true;
         }
 
         return false;
     }
 
+    public void addSymbol(String name, int address, VarType varType) {
+        Symbol newSymbol = new Symbol(name, address, varType);
+        this.symbols.add(newSymbol);
+    }
+
     public void addSymbol(String name, int address) {
         Symbol newSymbol = new Symbol(name, address);
         this.symbols.add(newSymbol);
     }
-
     public void removeSymbol(String name) {
         int i = 0;
         for (i = 0; i < this.symbols.size(); i++) {
-            if(symbols.get(i).name.equals(name))
+            if (symbols.get(i).name.equals(name))
                 break;
         }
         this.symbols.remove(i);

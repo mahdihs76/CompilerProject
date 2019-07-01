@@ -435,6 +435,7 @@ public class Parser {
         ttt(Token.Type.OPEN_PARENTHESES, thisNode);
         nnn("PARS", thisNode);
         ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        sa.executeSemanticRoutine(RoutineType.FUNENDPARS);
         nnn("CS", thisNode);
         sa.executeSemanticRoutine(RoutineType.FUNJPCALLER);
 
@@ -621,9 +622,12 @@ public class Parser {
         ttt(Token.Type.OPEN_PARENTHESES, thisNode);
         nnn("E", thisNode);
         ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        sa.executeSemanticRoutine(RoutineType.IF_SAVE);
         nnn("S", thisNode);
         ttt(Token.Type.ELSE, thisNode);
+        sa.executeSemanticRoutine(RoutineType.IF_JP_SAVE);
         nnn("S", thisNode);
+        sa.executeSemanticRoutine(RoutineType.END_IF);
 
         return true;
     }

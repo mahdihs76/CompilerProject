@@ -12,17 +12,22 @@ public class Instruction {
 
     private Type type;
     private int[] operands;
+    private boolean[] boolArray;
 
-    public Instruction(Type type) {
-        this.type = type;
-        this.operands = new int[type.numOperands];
-    }
 
     public Instruction(Type type, int[] operands) {
-        this.type = type;
-        this.operands = operands;
+        boolean[] boolArray = new boolean[operands.length];
+        for (int i = 0; i < operands.length; i++) {
+            boolArray[i] = false;
+        }
+        new Instruction(type, operands, boolArray);
     }
 
+    public Instruction(Type type, int[] operands, boolean[] boolArray) {
+        this.type = type;
+        this.operands = operands;
+        this.boolArray = boolArray;
+    }
 
 
 

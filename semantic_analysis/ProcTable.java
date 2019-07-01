@@ -7,6 +7,10 @@ public class ProcTable {
 
     public class Procedure {
 
+        public int getCodeEndAdress() {
+            return codeEndAdress;
+        }
+
         public class Param {
             private String name;
             private VarType varType;
@@ -40,6 +44,14 @@ public class ProcTable {
             this.params = new ArrayList<Param>();
         }
 
+        public String getParamNameByIndex(int index) {
+            return params.get(index).getName();
+        }
+
+        public VarType getParamTypeByIndex(int index) {
+            return params.get(index).getVarType();
+        }
+
         public void setReturnType(VarType returnType) {
             this.returnType = returnType;
         }
@@ -56,6 +68,11 @@ public class ProcTable {
 
         public String getName() { return this.name; }
         public int getCodeStartAdress() { return this.codeStartAdress; }
+
+        public int getParamsCount() {
+            if (params == null || params.isEmpty()) return 0;
+            return params.size();
+        }
 
     }
 
@@ -102,6 +119,15 @@ public class ProcTable {
             }
         }
         return null;
+    }
+
+    public int getProcIndexByName(String procName) {
+        for(Procedure p: procs) {
+            if (p.getName().equals(procName)) {
+                return procs.indexOf(p);
+            }
+        }
+        return -1;
     }
 
     public Procedure getProcByIndex(int procIndex) {
