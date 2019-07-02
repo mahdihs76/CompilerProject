@@ -44,7 +44,7 @@ public class ActivationRecord {
     }
 
 
-    public LocalVariable searchLocalVariable(int address) {
+    public LocalVariable searchLocalVariable(int address, String idName) {
         for(LocalVariable v: this.localVars){
             if(v.address == address)
                 return v;

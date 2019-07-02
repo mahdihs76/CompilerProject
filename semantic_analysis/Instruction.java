@@ -49,12 +49,20 @@ public class Instruction {
 
         private int numOperands;
 
-        private Type(int numOperands) {
+        Type(int numOperands) {
             this.numOperands = numOperands;
         }
 
     }
 
+
+    public int[] getOperands() {
+        return operands;
+    }
+
+    public void setOperands(int[] operands) {
+        this.operands = operands;
+    }
 
     @Override
     public String toString() {
@@ -64,7 +72,7 @@ public class Instruction {
             sb.append(", ");
             if(boolArray[i])
                 sb.append("#");
-            sb.append(Integer.toString(operand));
+            sb.append(operand);
         }
         sb.append(", ".repeat(Math.max(0, 3 - type.numOperands)));
         return '(' + sb.toString() + ')' + '\n';

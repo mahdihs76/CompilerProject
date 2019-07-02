@@ -603,9 +603,11 @@ public class Parser {
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
             ttt(Token.Type.CONTINUE, thisNode);
+            sa.executeSemanticRoutine(RoutineType.CONTINUE);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter3) {
             ttt(Token.Type.BREAK, thisNode);
+            sa.executeSemanticRoutine(RoutineType.BREAK);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter4) {
             ttt(Token.Type.SEMICOLON, thisNode);

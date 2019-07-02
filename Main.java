@@ -1,7 +1,12 @@
 import parser.Parser;
+import semantic_analysis.Instruction;
+import semantic_analysis.SemanticAnalyser;
 import tokenizer.Token;
 import tokenizer.Tokenizer;
 import utility.FileHelper;
+import utility.HashUtils;
+
+import java.util.ArrayList;
 
 public class Main {
 
@@ -15,7 +20,9 @@ public class Main {
 
         try {
             parser.parse_program();
-        }catch (Exception ignored){ /* do nothing */ }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         FileHelper.writeOutput(tokenizer.getResultString(), "tokens.txt");
         FileHelper.writeOutput(tokenizer.getLexicalErrorsString(), "lexicalErrors.txt");
@@ -24,8 +31,12 @@ public class Main {
         FileHelper.writeOutput(parser.getParseTreeString(), "parseTree.txt");
 
 
-        FileHelper.writeOutput(parser.getSemanticAnalyser().getIntermediateCodeString(), "instructions.txt");
-        FileHelper.writeOutput(parser.getSemanticAnalyser().getSemanticErrorsString(), "semanticErrors.txt");
+        SemanticAnalyser analyser = parser.getSemanticAnalyser();
+
+        HashUtils.normalizeHashOperands(analyser);
+        FileHelper.writeOutput(analyser.getIntermediateCodeString(), "instructions.txt");
+        FileHelper.writeOutput(analyser.getSemanticErrorsString(), "semanticErrors.txt");
 
     }
+
 }

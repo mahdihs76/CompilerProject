@@ -54,6 +54,10 @@ public class ProcTable {
             return params.get(index).getVarType();
         }
 
+        public boolean findParam(String name){
+            return params.stream().anyMatch(param -> param.getName().equals(name));
+        }
+
         public void setReturnType(VarType returnType) {
             this.returnType = returnType;
         }

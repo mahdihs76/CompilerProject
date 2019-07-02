@@ -14,6 +14,7 @@ public class SymbolTable {
             this(name, address);
             this.varType = varType;
         }
+
         public Symbol(String name, int address) {
             this.name = name;
             this.address = address;
@@ -22,9 +23,15 @@ public class SymbolTable {
         public String getName() {
             return this.name;
         }
+
         public int getAddress() {
             return this.address;
         }
+
+        public void setAddress(int address) {
+            this.address = address;
+        }
+
         public VarType getVarType() {
             return varType;
         }
@@ -56,6 +63,13 @@ public class SymbolTable {
         return getByAddress(address).getName();
     }
 
+    public Symbol getSymbolByHashCode(int hashcode) {
+        for (Symbol symbol : symbols) {
+            if (symbol.getName().hashCode() == hashcode) return symbol;
+        }
+        return null;
+    }
+
 
     public Symbol getByAddress(int address) {
         for (Symbol symbol : this.symbols) {
@@ -76,6 +90,15 @@ public class SymbolTable {
     }
 
     public void addSymbol(String name, int address, VarType varType) {
+//        for (int i = 0; i < symbols.size(); i++) {
+//            Symbol symbol = symbols.get(i);
+//            if (symbol.getName().equals(name)) {
+//                symbol.setAddress(address);
+//                symbols.set(i, symbol);
+//                return;
+//            }
+//        }
+
         Symbol newSymbol = new Symbol(name, address, varType);
         this.symbols.add(newSymbol);
     }
@@ -90,6 +113,7 @@ public class SymbolTable {
         Symbol newSymbol = new Symbol(name, address);
         this.symbols.add(newSymbol);
     }
+
     public void removeSymbol(String name) {
         int i = 0;
         for (i = 0; i < this.symbols.size(); i++) {

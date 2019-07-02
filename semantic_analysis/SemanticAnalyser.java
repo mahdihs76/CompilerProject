@@ -3,6 +3,7 @@ package semantic_analysis;
 import parser.Parser;
 import tokenizer.Token;
 import semantic_analysis.ProcTable.*;
+import utility.HashUtils;
 
 import java.util.*;
 
@@ -43,6 +44,10 @@ public class SemanticAnalyser {
         this.currARPtr = global;
 
         this.procTable = new ProcTable();
+        procTable.addProc("output");
+        Procedure outputProcedure = procTable.getProcByName("output");
+        outputProcedure.setReturnType(VarType.VOID);
+
         this.symbolTable = new SymbolTable();
 
         this.semanticStack = new Stack<>();
@@ -123,11 +128,12 @@ public class SemanticAnalyser {
 
 
 
-    private boolean findVarSymbol(ActivationRecord ar, int address) {
+    private boolean findVarSymbol(ActivationRecord ar, int address, String idName) {
         if (ar == null) return false;
-        ActivationRecord.LocalVariable lv = ar.searchLocalVariable(address);
-        if (lv == null) {
-            return findVarSymbol(ar.getControlLink(), address);
+        ActivationRecord.LocalVariable lv = ar.searchLocalVariable(address, idName);
+        boolean findVarInParams = procTable.getProcByName(ar.getName()).findParam(idName);
+        if (lv == null && !findVarInParams) {
+            return findVarSymbol(ar.getControlLink(), address, idName);
         } else {
             return true;
         }
@@ -161,6 +167,13 @@ public class SemanticAnalyser {
         }
     }
 
+    public ProcTable getProcTable() {
+        return procTable;
+    }
+
+    public SymbolTable getSymbolTable() {
+        return symbolTable;
+    }
 
     /**
      * Prosedure Stack & AR Methods
@@ -237,6 +250,8 @@ public class SemanticAnalyser {
 
 
         ActivationRecord newAR = new ActivationRecord(procName);
+        if(currARPtr.getName().equals("Global") && !newAR.getName().equals("main"))
+            addSemanticError(getLastToken().getLine(), "unacceptable name for global function (" + newAR.getName() + ")");
         newAR.setControlLink(currARPtr);
         currARPtr.addLocalProcedure(procName);
         currARPtr = newAR;
@@ -272,7 +287,7 @@ public class SemanticAnalyser {
 
     private void routine_PARID() {
         String parName = getLastToken().getText();
-        tempSymbolTable.addSymbol(parName, 0);
+        symbolTable.addSymbol(parName, HashUtils.makeHash(parName));
     }
 
     private void routine_SETPAR() {
@@ -285,8 +300,7 @@ public class SemanticAnalyser {
         } else {
             if (isArray) parType = VarType.INTARRAY;
 
-            String parName = tempSymbolTable.getLastSymbol().getName();
-            tempSymbolTable.removeLastSymbol();
+            String parName = symbolTable.getLastSymbol().getName();
 
             Procedure proc = procTable.getProcByIndex(getItemFromSS(0));
             proc.addParam(parName, parType);
@@ -311,12 +325,16 @@ public class SemanticAnalyser {
         int returnLineMemAddress = proc.getReturnLineMemAddress();
         if(returnLineMemAddress != -1)
             addInstructionToCodeMemory(returnLineMemAddress, new Instruction(Instruction.Type.JP, new int[]{codeMemPtr}));
-        else
-            addSemanticError(getOneToLastToken().getLine(), "There should be a return statement in " + proc.getName() + " function");
+        else {
+            if(!proc.getName().equals("output"))
+                addSemanticError(getOneToLastToken().getLine(), "There should be a return statement in " + proc.getName() + " function");
+        }
 
         proc.setCodeEndAdress(codeMemPtr);
-        addInstructionToCodeMemory(proc.getBeforeCodeStartAddress(), new Instruction(Instruction.Type.JP, new int[]{codeMemPtr}));
-        //codeMemPtr++;
+        codeMemPtr++;
+        if(!proc.getName().equals("main")) {
+            addInstructionToCodeMemory(proc.getBeforeCodeStartAddress(), new Instruction(Instruction.Type.JP, new int[]{codeMemPtr}));
+        }
 
         currARPtr = currARPtr.getControlLink();
 
@@ -358,6 +376,17 @@ public class SemanticAnalyser {
         popNItemsFromSS(3);
     }
 
+    private void routine_BREAK() {
+        addInstructionToCodeMemory(new Instruction(Instruction.Type.JP, new int[]{getItemFromSS(2)}));
+
+    }
+
+    private void routine_CONTINUE() {
+        addInstructionToCodeMemory(new Instruction(Instruction.Type.JP, new int[]{getItemFromSS(2)}));
+        popNItemsFromSS(3);
+    }
+
+
     private void routine_SYMBOL() {
         String idName = getLastToken().getText();
         int address = symbolTable.getAddressByName(idName);
@@ -365,10 +394,16 @@ public class SemanticAnalyser {
             int procIndex = procTable.getProcIndexByName(idName);
             pushIntoSS(procIndex);
             pushIntoSS(address);
-        } else if (address != -1 && findVarSymbol(currARPtr, address)) {
+        } else if (address != -1 && findVarSymbol(currARPtr, address, idName)) {
             pushIntoSS(address);
         } else {
-            addSemanticError(getLastToken().getLine(), idName + " is not defined");
+            if(!idName.equals("output"))
+                addSemanticError(getLastToken().getLine(), idName + " is not defined");
+            else {
+                pushIntoSS(procTable.getProcIndexByName("output"));
+                pushIntoSS(address);
+            }
+
         }
     }
 
@@ -383,14 +418,21 @@ public class SemanticAnalyser {
 
         int offset = getItemFromSS(0);
         popNItemsFromSS(2);
-        pushIntoSS(idAddress + offset * 4);
+
+        addInstructionToCodeMemory(new Instruction(Instruction.Type.MULT, new int[]{offset, 4, tempMemPtr}, new boolean[]{false, true, false}));
+        symbolTable.addSymbol(tempMemPtr, VarType.INT);
+        addInstructionToCodeMemory(new Instruction(Instruction.Type.ADD, new int[]{tempMemPtr, idAddress, tempMemPtr}));
+
+        pushIntoSS(tempMemPtr);
+        tempMemPtr += 4;
     }
 
     private void routine_FUNCALL() {
         int idAddress = getItemFromSS(0);
 
         String procName = getOneToLastToken().getText();
-        if (idAddress != -1) {
+
+        if (!procName.equals("output") && idAddress != -1) {
             addSemanticError(getLastToken().getLine(), procName + " is not defined");
         }
 
@@ -401,6 +443,27 @@ public class SemanticAnalyser {
     private void routine_FUNCALLJP() {
         int procIndex = getItemFromSS(argNum);
         Procedure procedure = procTable.getProcByIndex(procIndex);
+
+        if(procedure.getName().equals("output")){
+            if (argNum != 1) {
+                addSemanticError(getLastToken().getLine(), "Mismatch in number of arguments in " + procedure.getName());
+                popNItemsFromSS(2);
+                return;
+            }
+            int argAddress = getItemFromSS(0);
+            SymbolTable.Symbol ithArgumentSymbol = symbolTable.getByAddress(argAddress);
+            if (ithArgumentSymbol.getVarType() == VarType.INTARRAY) {
+                addSemanticError(getOneToLastToken().getLine(), "unacceptable input type for function 'output'");
+            } else if (ithArgumentSymbol.getVarType() == VarType.INT) {
+                addInstructionToCodeMemory(new Instruction(Instruction.Type.PRINT, new int[]{argAddress}));
+            } else {
+                addSemanticError(getLastToken().getLine(), "incompatible input type for function 'output");
+            }
+            popNItemsFromSS(2);
+
+            return;
+        }
+
         ActivationRecord activationRecord = currARPtr.findAccessibleChild(procedure.getName());
 
         if (procedure.getParamsCount() != argNum) {
@@ -514,7 +577,7 @@ public class SemanticAnalyser {
 
     private void routine_ASSIGN() {
         twoOperandsRoutineCall(getItemFromSS(0), getItemFromSS(1), Instruction.Type.ASSIGN);
-        popNItemsFromSS(1);
+//        popNItemsFromSS(1);
     }
 
     private void routine_VOIDRETURN() {
@@ -523,8 +586,7 @@ public class SemanticAnalyser {
 
         codeMemPtr++;
 
-        popNItemsFromSS(1);
-
+//        popNItemsFromSS(1);
     }
 
 
@@ -537,9 +599,10 @@ public class SemanticAnalyser {
 
         codeMemPtr++;
 
-        popNItemsFromSS(1);
+        //popNItemsFromSS(1);
 
     }
+
 
     public void executeSemanticRoutine(RoutineType routineType) {
         switch (routineType) {
@@ -657,6 +720,12 @@ public class SemanticAnalyser {
             case VOIDRETURN:
                 routine_VOIDRETURN();
                 break;
+            case CONTINUE:
+                routine_CONTINUE();
+                break;
+            case BREAK:
+                routine_BREAK();
+                break;
         }
 
     }
@@ -700,12 +769,23 @@ public class SemanticAnalyser {
         LTOREQ,
         ASSIGN,
         RETURN,
-        VOIDRETURN
+        VOIDRETURN,
+        CONTINUE,
+        BREAK
+    }
+
+
+    private SymbolTable.Symbol getAppropriateSymbol(int address){
+        if (HashUtils.isHashCode(address)) {
+            return symbolTable.getSymbolByHashCode(address);
+        } else {
+            return symbolTable.getByAddress(address);
+        }
     }
 
 
     private void RoutineCall(int first, int second, Instruction.Type type, int[] operands){
-        if (symbolTable.getByAddress(first).getVarType() != symbolTable.getByAddress(second).getVarType()) {
+        if (getAppropriateSymbol(first).getVarType() != getAppropriateSymbol(second).getVarType()) {
             addSemanticError(getLastToken().getLine(), "Type mismatch in operands.");
             popNItemsFromSS(2);
             return;
@@ -716,9 +796,11 @@ public class SemanticAnalyser {
             popNItemsFromSS(operands.length);
 
         addInstructionToCodeMemory(new Instruction(type, operands));
-        symbolTable.addSymbol(dataMemPtr, VarType.INT);
-        pushIntoSS(dataMemPtr);
-        dataMemPtr += 4;
+        if (type != Instruction.Type.ASSIGN) {
+            symbolTable.addSymbol(dataMemPtr, VarType.INT);
+            pushIntoSS(dataMemPtr);
+            dataMemPtr += 4;
+        }
     }
 
     private void threeOperandsRoutineCall(int first, int second, Instruction.Type type){
