@@ -11,7 +11,10 @@ public class ActivationRecord {
 
     private ActivationRecord controlLink;
     private ArrayList<ActivationRecord> childs;
+
     private Integer returnValue;
+    private int returnAddress;
+
     private ArrayList<VarType> parameters;
 
     private ArrayList<String> localProcedures;
@@ -24,6 +27,7 @@ public class ActivationRecord {
         this.childs = new ArrayList<>();
         this.controlLink = null;
         this.returnValue = null;
+        this.returnAddress = -1;
         this.parameters = new ArrayList<>();
     }
 
@@ -50,7 +54,7 @@ public class ActivationRecord {
 
     public boolean searchLocalProc(String name) {
         for(String procName: this.localProcedures){
-            if(procName == name)
+            if(procName.equals(name))
                 return true;
         }
         return false;
@@ -84,6 +88,23 @@ public class ActivationRecord {
     public ActivationRecord getControlLink() {
         return controlLink;
     }
+
+    public int getReturnAddress() {
+        return this.returnAddress;
+    }
+
+    public void setReturnAddress(int returnAddress) {
+        this.returnAddress = returnAddress;
+    }
+
+    public void setReturnValue(Integer returnValue) {
+        this.returnValue = returnValue;
+    }
+
+    public Integer getReturnValue() {
+        return returnValue;
+    }
+
 
 
     public class LocalVariable {

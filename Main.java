@@ -24,6 +24,8 @@ public class Main {
         FileHelper.writeOutput(parser.getParseTreeString(), "parseTree.txt");
 
 
+        FileHelper.writeOutput(parser.getSemanticAnalyser().getIntermediateCodeString(), "instructions.txt");
+        FileHelper.writeOutput(parser.getSemanticAnalyser().getSemanticErrorsString(), "semanticErrors.txt");
 
     }
 }

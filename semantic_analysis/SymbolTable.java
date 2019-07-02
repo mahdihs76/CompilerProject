@@ -6,9 +6,9 @@ import java.util.ArrayList;
 public class SymbolTable {
 
     public class Symbol {
-        public String name;
-        public int address;
-        public VarType varType;
+        private String name;
+        private int address;
+        private VarType varType;
 
         public Symbol(String name, int address, VarType varType) {
             this(name, address);
@@ -22,10 +22,13 @@ public class SymbolTable {
         public String getName() {
             return this.name;
         }
-
         public int getAddress() {
             return this.address;
         }
+        public VarType getVarType() {
+            return varType;
+        }
+
     }
 
 
@@ -75,6 +78,12 @@ public class SymbolTable {
     public void addSymbol(String name, int address, VarType varType) {
         Symbol newSymbol = new Symbol(name, address, varType);
         this.symbols.add(newSymbol);
+    }
+
+
+    public void addSymbol(int address, VarType varType) {
+        String symbolName = "Symbol:" + System.currentTimeMillis();
+        this.symbols.add(new Symbol(symbolName, address, varType));
     }
 
     public void addSymbol(String name, int address) {

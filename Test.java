@@ -3,12 +3,14 @@ import java.util.Stack;
 
 public class Test {
     public static void main(String[] args) {
-        Stack<Integer> s = new Stack<Integer>();
-        s.push(1);
-        s.push(2);
-        s.push(3);
-        s.push(4);
-        s.push(5);
-        System.out.println(s.get(s.size() - 1));
+        ArrayList<Character> s = new ArrayList<>();
+        s.add('a');
+        s.add('b');
+        s.add('c');
+        s.add('d');
+        s.add('e');
+
+        s.set(0, 'x');
+        System.out.println(s);
     }
 }

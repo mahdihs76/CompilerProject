@@ -638,10 +638,12 @@ public class Parser {
 
         ttt(Token.Type.WHILE, thisNode);
         ttt(Token.Type.OPEN_PARENTHESES, thisNode);
+        sa.executeSemanticRoutine(RoutineType.WH_LABEL);
         nnn("E", thisNode);
         ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        sa.executeSemanticRoutine(RoutineType.WH_SAVE);
         nnn("S", thisNode);
-
+        sa.executeSemanticRoutine(RoutineType.ENDWH);
         return true;
     }
 
@@ -663,9 +665,11 @@ public class Parser {
         boolean enter2 = isAllowedToEnterNT("E");
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.VOIDRETURN);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
             nnn("E", thisNode);
+            sa.executeSemanticRoutine(RoutineType.RETURN);
             ttt(Token.Type.SEMICOLON, thisNode);
         }
 
@@ -736,6 +740,7 @@ public class Parser {
         boolean enter2 = isAllowedToEnterNT("SF1");
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.SYMBOL);
             ttt(Token.Type.ID, thisNode);
             nnn("EID", thisNode);
         }else if(enter2) {
@@ -759,10 +764,12 @@ public class Parser {
         if(enter1) {
             ttt(Token.Type.ASSIGN, thisNode);
             nnn("E", thisNode);
+            sa.executeSemanticRoutine(RoutineType.ASSIGN);
         }else if(enter2) {
             ttt(Token.Type.OPEN_BRACKETS, thisNode);
             nnn("E", thisNode);
             ttt(Token.Type.CLOSE_BRACKETS, thisNode);
+            sa.executeSemanticRoutine(RoutineType.GETARR);
             nnn("EID1", thisNode);
         }else if(enter3) {
             nnn("VC2", thisNode);
@@ -784,6 +791,7 @@ public class Parser {
         if(enter1) {
             ttt(Token.Type.ASSIGN, thisNode);
             nnn("E", thisNode);
+            sa.executeSemanticRoutine(RoutineType.ASSIGN);
         }else if(enter2) {
             nnn("T1", thisNode);
             nnn("AE1", thisNode);
@@ -803,6 +811,7 @@ public class Parser {
         if(enter1) {
             nnn("R", thisNode);
             nnn("AE", thisNode);
+            sa.executeSemanticRoutine(RoutineType.LTOREQ);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -831,6 +840,7 @@ public class Parser {
         if(enter1) {
             nnn("A", thisNode);
             nnn("T", thisNode);
+            sa.executeSemanticRoutine(RoutineType.PLORMI);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -848,8 +858,10 @@ public class Parser {
 
         if(enter1) {
             ttt(Token.Type.PLUS, thisNode);
+            sa.executeSemanticRoutine(RoutineType.PLUS);
         }else if(enter2) {
             ttt(Token.Type.MINUS, thisNode);
+            sa.executeSemanticRoutine(RoutineType.MINUS);
         }
 
         return true;
@@ -864,8 +876,10 @@ public class Parser {
 
         if(enter1) {
             ttt(Token.Type.LESS_THAN, thisNode);
+            sa.executeSemanticRoutine(RoutineType.LT);
         }else if(enter2) {
             ttt(Token.Type.EQ, thisNode);
+            sa.executeSemanticRoutine(RoutineType.EQ);
         }
 
         return true;
@@ -891,6 +905,7 @@ public class Parser {
         if(enter1) {
             ttt(Token.Type.TIMES, thisNode);
             nnn("SF", thisNode);
+            sa.executeSemanticRoutine(RoutineType.FMULT);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -929,6 +944,7 @@ public class Parser {
         }else if(enter2) {
             ttt(Token.Type.MINUS, thisNode);
             nnn("F", thisNode);
+            sa.executeSemanticRoutine(RoutineType.FMINUS);
         }else if(enter3) {
             nnn("F1", thisNode);
         }
@@ -951,6 +967,7 @@ public class Parser {
             nnn("E", thisNode);
             ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
         } else if(enter3) {
+            sa.executeSemanticRoutine(RoutineType.NUM);
             ttt(Token.Type.NUM, thisNode);
         }
 
@@ -969,6 +986,7 @@ public class Parser {
             nnn("E", thisNode);
             ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
         }else if(enter2) {
+            sa.executeSemanticRoutine(RoutineType.NUM);
             ttt(Token.Type.NUM, thisNode);
         }
 
@@ -979,6 +997,7 @@ public class Parser {
         TreeNode thisNode = new TreeNode("VC");
         parNode.addChild(thisNode);
 
+        sa.executeSemanticRoutine(RoutineType.SYMBOL);
         ttt(Token.Type.ID, thisNode);
         nnn("VC1", thisNode);
 
@@ -997,10 +1016,13 @@ public class Parser {
             ttt(Token.Type.OPEN_BRACKETS, thisNode);
             nnn("E", thisNode);
             ttt(Token.Type.CLOSE_BRACKETS, thisNode);
+            sa.executeSemanticRoutine(RoutineType.GETARR);
         } else if(enter2) {
+            sa.executeSemanticRoutine(RoutineType.FUNCALL);
             ttt(Token.Type.OPEN_PARENTHESES, thisNode);
             nnn("ARGS", thisNode);
             ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+            sa.executeSemanticRoutine(RoutineType.FUNCALLJP);
         } else if (enter3) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1017,9 +1039,11 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("VC2");
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.FUNCALL);
             ttt(Token.Type.OPEN_PARENTHESES, thisNode);
             nnn("ARGS", thisNode);
             ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+            sa.executeSemanticRoutine(RoutineType.FUNCALLJP);
         } else if (enter2) {
             thisNode.addChild(new TreeNode("ε"));
             return true;
@@ -1036,6 +1060,7 @@ public class Parser {
         boolean enter2 = isAllowedToPassEPSILON("ARGS");
 
         if(enter1) {
+            sa.executeSemanticRoutine(RoutineType.ZEROARGNUM);
             nnn("ARL", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
@@ -1050,6 +1075,7 @@ public class Parser {
         parNode.addChild(thisNode);
 
         nnn("E", thisNode);
+        sa.executeSemanticRoutine(RoutineType.COUNTARG);
         nnn("ARL1", thisNode);
 
         return true;
@@ -1065,6 +1091,7 @@ public class Parser {
         if(enter1) {
             ttt(Token.Type.COMMA, thisNode);
             nnn("E", thisNode);
+            sa.executeSemanticRoutine(RoutineType.COUNTARG);
             nnn("ARL1", thisNode);
         }else if(enter2) {
             thisNode.addChild(new TreeNode("ε"));
@@ -1116,7 +1143,9 @@ public class Parser {
     }
 
 
-
+    public SemanticAnalyser getSemanticAnalyser() {
+        return sa;
+    }
 }
 
 

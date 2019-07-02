@@ -1,15 +1,12 @@
 package semantic_analysis;
 
-import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 
 public class ProcTable {
 
     public class Procedure {
 
-        public int getCodeEndAdress() {
-            return codeEndAdress;
-        }
+
 
         public class Param {
             private String name;
@@ -28,17 +25,23 @@ public class ProcTable {
             }
         }
 
+
         private String name;
-        private int codeStartAdress;
+        private int codeStartAddress;
+        private int codeEndAdress;
+        private int returnLineMemAddress;
+        private int beforeCodeStartAddress;
+        private int beforeCodeEndAddress;
+
         private VarType returnType;
         private int callerAddress;
-        private int codeEndAdress;
         private ArrayList<Integer> callingAddresses;
         private ArrayList<Param> params;
 
 
         public Procedure(String name) {
             this.name = name;
+            this.returnLineMemAddress = -1;
             this.returnType = VarType.VOID;
             this.callingAddresses = new ArrayList<Integer>();
             this.params = new ArrayList<Param>();
@@ -47,7 +50,6 @@ public class ProcTable {
         public String getParamNameByIndex(int index) {
             return params.get(index).getName();
         }
-
         public VarType getParamTypeByIndex(int index) {
             return params.get(index).getVarType();
         }
@@ -59,15 +61,40 @@ public class ProcTable {
             params.add(new Param(parName, parType));
         }
 
-        public void setCodeStartAdress(int codeStartAdress) {
-             this.codeStartAdress = codeStartAdress;
+        public void setCodeStartAddress(int codeStartAddress) {
+             this.codeStartAddress = codeStartAddress;
         }
         public void setCodeEndAdress(int codeEndAdress) {
             this.codeEndAdress = codeEndAdress;
         }
 
+        public int getCodeEndAddress() {
+            return codeEndAdress;
+        }
+
+        public int getReturnLineMemAddress() {
+            return returnLineMemAddress;
+        }
+        public void setReturnLineMemAddress(int returnLineMemAddress) {
+            this.returnLineMemAddress = returnLineMemAddress;
+        }
+
+        public int getBeforeCodeEndAddress() {
+            return beforeCodeEndAddress;
+        }
+        public void setBeforeCodeEndAddress(int beforeCodeEndAddress) {
+            this.beforeCodeEndAddress = beforeCodeEndAddress;
+        }
+
+        public int getBeforeCodeStartAddress() {
+            return beforeCodeStartAddress;
+        }
+        public void setBeforeCodeStartAddress(int beforeCodeStartAddress) {
+            this.beforeCodeStartAddress = beforeCodeStartAddress;
+        }
+
         public String getName() { return this.name; }
-        public int getCodeStartAdress() { return this.codeStartAdress; }
+        public int getCodeStartAddress() { return this.codeStartAddress; }
 
         public int getParamsCount() {
             if (params == null || params.isEmpty()) return 0;
@@ -90,7 +117,7 @@ public class ProcTable {
     public void setCodeStartAdress(String procName, int codeStartAdress) {
         for(Procedure p: procs) {
             if (p.getName().equals(procName)) {
-                p.setCodeStartAdress(codeStartAdress);
+                p.setCodeStartAddress(codeStartAdress);
                 break;
             }
         }

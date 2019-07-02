@@ -7,6 +7,7 @@ package semantic_analysis;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class Instruction {
 
@@ -20,7 +21,9 @@ public class Instruction {
         for (int i = 0; i < operands.length; i++) {
             boolArray[i] = false;
         }
-        new Instruction(type, operands, boolArray);
+        this.type = type;
+        this.operands = operands;
+        this.boolArray = boolArray;
     }
 
     public Instruction(Type type, int[] operands, boolean[] boolArray) {
@@ -53,4 +56,17 @@ public class Instruction {
     }
 
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(type.toString());
+        for (int i = 0; i < type.numOperands; i++) {
+            int operand = operands[i];
+            sb.append(", ");
+            if(boolArray[i])
+                sb.append("#");
+            sb.append(Integer.toString(operand));
+        }
+        sb.append(", ".repeat(Math.max(0, 3 - type.numOperands)));
+        return '(' + sb.toString() + ')' + '\n';
+    }
 }
