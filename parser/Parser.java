@@ -9,6 +9,8 @@ import utility.TreeHandler;
 import java.util.ArrayList;
 import semantic_analysis.SemanticAnalyser.RoutineType;
 
+import javax.security.auth.DestroyFailedException;
+
 
 public class Parser {
 
@@ -603,11 +605,12 @@ public class Parser {
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
             ttt(Token.Type.CONTINUE, thisNode);
-            sa.executeSemanticRoutine(RoutineType.CONTINUE);
+            //sa.executeSemanticRoutine(RoutineType.CONTINUE);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter3) {
             ttt(Token.Type.BREAK, thisNode);
-            sa.executeSemanticRoutine(RoutineType.BREAK);
+            //sa.executeSemanticRoutine(RoutineType.BREAK);
+            sa.executeSemanticRoutine(RoutineType.SWBREAK);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter4) {
             ttt(Token.Type.SEMICOLON, thisNode);
@@ -686,10 +689,12 @@ public class Parser {
         ttt(Token.Type.OPEN_PARENTHESES, thisNode);
         nnn("E", thisNode);
         ttt(Token.Type.CLOSE_PARENTHESES, thisNode);
+        sa.executeSemanticRoutine(RoutineType.SWSTART);
         ttt(Token.Type.OPEN_BRACES, thisNode);
         nnn("CASS", thisNode);
         nnn("DS", thisNode);
         ttt(Token.Type.CLOSE_BRACES, thisNode);
+        sa.executeSemanticRoutine(RoutineType.SWEND);
 
         return true;
     }
@@ -703,6 +708,7 @@ public class Parser {
 
         if(enter1) {
             ttt(Token.Type.CASE, thisNode);
+            sa.executeSemanticRoutine(RoutineType.CASESAVE);
             ttt(Token.Type.NUM, thisNode);
             ttt(Token.Type.COLON, thisNode);
             nnn("SL", thisNode);
@@ -724,6 +730,7 @@ public class Parser {
 
         if(enter1) {
             ttt(Token.Type.DEFAULT, thisNode);
+            sa.executeSemanticRoutine(RoutineType.DEFAULT);
             ttt(Token.Type.COLON, thisNode);
             nnn("SL", thisNode);
         }else if(enter2) {

@@ -14,6 +14,7 @@ public class SemanticAnalyser {
     private static final int KEY_MINUS = 10006;
     private static final int KEY_LT = 10007;
     private static final int KEY_EQ = 10008;
+    private static final int START_SWITCH_KEY = 10009;
 
     private int argNum;
     private Stack<ActivationRecord> ARStack;
@@ -35,6 +36,8 @@ public class SemanticAnalyser {
     private ArrayList<Token> input;
     private Parser.IntIndex inputIndex;
 
+    private ArrayList<Integer> switchBreakList;
+    private boolean withCaseStmt;
 
 
     public SemanticAnalyser(ArrayList<Token> input, Parser.IntIndex inputIndex) {
@@ -603,6 +606,81 @@ public class SemanticAnalyser {
 
     }
 
+    private void routine_SWSTART() {
+        withCaseStmt = false;
+        pushIntoSS(START_SWITCH_KEY);
+        switchBreakList = new ArrayList<>();
+    }
+
+    private void routine_CASESAVE() {
+        withCaseStmt = true;
+        int topOfSS = getItemFromSS(0);
+        if(topOfSS != START_SWITCH_KEY){
+            int exprAddr = getItemFromSS(2);
+            int prevCaseAddr = getItemFromSS(1);
+            int prevCaseImmediateNum = getItemFromSS(0);
+
+            addInstructionToCodeMemory(prevCaseAddr, new Instruction(Instruction.Type.EQ, new int[]{exprAddr, prevCaseImmediateNum, tempMemPtr}, new boolean[]{false, true, false}));
+            symbolTable.addSymbol(tempMemPtr, VarType.INT);
+            addInstructionToCodeMemory(prevCaseAddr + 1, new Instruction(Instruction.Type.JPF, new int[]{tempMemPtr, codeMemPtr}));
+            codeMemPtr++;
+            tempMemPtr += 4;
+
+            popNItemsFromSS(2);
+
+        } else
+            popNItemsFromSS(1);
+
+        pushIntoSS(codeMemPtr);
+
+        codeMemPtr++;
+        codeMemPtr++;
+
+        int immediateNum = Integer.parseInt(getLastToken().getText());
+        pushIntoSS(immediateNum);
+
+    }
+
+    private void routine_DEFAULT() {
+        if(!withCaseStmt)
+            return;
+
+        int exprAddr = getItemFromSS(2);
+        int prevCaseAddr = getItemFromSS(1);
+        int prevCaseImmediateNum = getItemFromSS(0);
+
+        addInstructionToCodeMemory(prevCaseAddr, new Instruction(Instruction.Type.EQ, new int[]{exprAddr, prevCaseImmediateNum, tempMemPtr}, new boolean[]{false, true, false}));
+        symbolTable.addSymbol(tempMemPtr, VarType.INT);
+        addInstructionToCodeMemory(prevCaseAddr + 1, new Instruction(Instruction.Type.JPF, new int[]{tempMemPtr, codeMemPtr}));
+        codeMemPtr++;
+        tempMemPtr += 4;
+
+        popNItemsFromSS(2);
+    }
+
+    private void routine_SWEND() {
+        popNItemsFromSS(1);
+
+        for (int breakAddr : switchBreakList) {
+            addInstructionToCodeMemory(breakAddr, new Instruction(Instruction.Type.JP, new int[]{codeMemPtr}));
+        }
+        switchBreakList = null;
+    }
+
+    private void routine_SWBREAK() {
+        if (switchBreakList == null){
+            addSemanticError(getLastToken().getLine(), "No 'while' or 'switch' found for 'break'");
+            return;
+        }
+
+        switchBreakList.add(codeMemPtr++);
+    }
+
+
+
+
+
+
 
     public void executeSemanticRoutine(RoutineType routineType) {
         switch (routineType) {
@@ -726,9 +804,26 @@ public class SemanticAnalyser {
             case BREAK:
                 routine_BREAK();
                 break;
+            case SWSTART:
+                routine_SWSTART();
+                break;
+            case SWEND:
+                routine_SWEND();
+                break;
+            case CASESAVE:
+                routine_CASESAVE();
+                break;
+            case DEFAULT:
+                routine_DEFAULT();
+                break;
+            case SWBREAK:
+                routine_SWBREAK();
+                break;
+
         }
 
     }
+
 
 
     public enum RoutineType {
@@ -771,7 +866,14 @@ public class SemanticAnalyser {
         RETURN,
         VOIDRETURN,
         CONTINUE,
-        BREAK
+        BREAK,
+
+        SWSTART,
+        SWEND,
+        CASESAVE,
+        DEFAULT,
+        SWBREAK,
+
     }
 
 
