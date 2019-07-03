@@ -16,6 +16,7 @@ public class SemanticAnalyser {
     private static final int KEY_EQ = 10008;
     private static final int START_SWITCH_KEY = 10009;
 
+
     private int argNum;
     private Stack<ActivationRecord> ARStack;
     private ActivationRecord currARPtr;
@@ -37,6 +38,8 @@ public class SemanticAnalyser {
     private Parser.IntIndex inputIndex;
 
     private ArrayList<Integer> switchBreakList;
+    private ArrayList<Integer> whileBreakList;
+    private ArrayList<Integer> whileContinueList;
     private boolean withCaseStmt;
 
 
@@ -176,13 +179,6 @@ public class SemanticAnalyser {
 
     public SymbolTable getSymbolTable() {
         return symbolTable;
-    }
-
-    /**
-     * Prosedure Stack & AR Methods
-     **/
-    private void pushIntoARStack(ActivationRecord ar) {
-        this.ARStack.push(ar);
     }
 
 
@@ -351,10 +347,10 @@ public class SemanticAnalyser {
 
     private void routine_IFJPSAVE() {
         int index = getItemFromSS(0);
-        addInstructionToCodeMemory(index, new Instruction(Instruction.Type.JPF, new int[]{getItemFromSS(1), codeMemPtr}));
+        addInstructionToCodeMemory(index, new Instruction(Instruction.Type.JPF, new int[]{getItemFromSS(1), codeMemPtr + 1}));
+        popNItemsFromSS(2);
         pushIntoSS(codeMemPtr);
         codeMemPtr++;
-        popNItemsFromSS(2);
     }
 
     private void routine_ENDIF() {
@@ -367,28 +363,42 @@ public class SemanticAnalyser {
         pushIntoSS(codeMemPtr);
     }
 
+    private void routine_WHSTART() {
+        whileBreakList = new ArrayList<>();
+        whileContinueList = new ArrayList<>();
+    }
+
     private void routine_WHSAVE() {
         pushIntoSS(codeMemPtr);
         codeMemPtr++;
     }
 
     private void routine_ENDWH() {
+        for (int breakAddr : whileBreakList) {
+            addInstructionToCodeMemory(breakAddr, new Instruction(Instruction.Type.JP, new int[]{codeMemPtr}));
+        }
+        whileBreakList = null;
+
         int index = getItemFromSS(0);
         addInstructionToCodeMemory(index, new Instruction(Instruction.Type.JPF, new int[]{getItemFromSS(1), codeMemPtr + 1}));
         addInstructionToCodeMemory(new Instruction(Instruction.Type.JP, new int[]{getItemFromSS(2)}));
+
+        for (int continueAddr : whileContinueList) {
+            addInstructionToCodeMemory(continueAddr, new Instruction(Instruction.Type.JP, new int[]{getItemFromSS(2)}));
+        }
+        whileBreakList = null;
+
         popNItemsFromSS(3);
     }
 
-    private void routine_BREAK() {
-        addInstructionToCodeMemory(new Instruction(Instruction.Type.JP, new int[]{getItemFromSS(2)}));
+    private void routine_WHCONTINUE() {
+        if (whileContinueList == null) {
+            addSemanticError(getLastToken().getLine(), "No 'while' found for 'continue'");
+            return;
+        }
 
+        whileContinueList.add(codeMemPtr++);
     }
-
-    private void routine_CONTINUE() {
-        addInstructionToCodeMemory(new Instruction(Instruction.Type.JP, new int[]{getItemFromSS(2)}));
-        popNItemsFromSS(3);
-    }
-
 
     private void routine_SYMBOL() {
         String idName = getLastToken().getText();
@@ -592,7 +602,6 @@ public class SemanticAnalyser {
 //        popNItemsFromSS(1);
     }
 
-
     private void routine_RETURN() {
         currARPtr.setReturnAddress(getItemFromSS(0));
         popNItemsFromSS(1);
@@ -667,13 +676,19 @@ public class SemanticAnalyser {
         switchBreakList = null;
     }
 
-    private void routine_SWBREAK() {
-        if (switchBreakList == null){
+    private void routine_WHSWBREAK() {
+        if (switchBreakList == null && whileBreakList == null) {
             addSemanticError(getLastToken().getLine(), "No 'while' or 'switch' found for 'break'");
             return;
         }
+        else if(whileBreakList == null){
+            switchBreakList.add(codeMemPtr++);
+            return;
+        }
+        if(switchBreakList == null){
+            whileBreakList.add(codeMemPtr++);
+        }
 
-        switchBreakList.add(codeMemPtr++);
     }
 
 
@@ -738,6 +753,9 @@ public class SemanticAnalyser {
             case WH_LABEL:
                 routine_WHLABEL();
                 break;
+            case WHSTART:
+                routine_WHSTART();
+                break;
             case WH_SAVE:
                 routine_WHSAVE();
                 break;
@@ -798,11 +816,11 @@ public class SemanticAnalyser {
             case VOIDRETURN:
                 routine_VOIDRETURN();
                 break;
-            case CONTINUE:
-                routine_CONTINUE();
+            case WHCONTINUE:
+                routine_WHCONTINUE();
                 break;
-            case BREAK:
-                routine_BREAK();
+            case WHSWBREAK:
+                routine_WHSWBREAK();
                 break;
             case SWSTART:
                 routine_SWSTART();
@@ -816,9 +834,7 @@ public class SemanticAnalyser {
             case DEFAULT:
                 routine_DEFAULT();
                 break;
-            case SWBREAK:
-                routine_SWBREAK();
-                break;
+
 
         }
 
@@ -845,6 +861,7 @@ public class SemanticAnalyser {
         IF_JP_SAVE,
         END_IF,
         WH_LABEL,
+        WHSTART,
         WH_SAVE,
         ENDWH,
         GETARR,
@@ -865,14 +882,12 @@ public class SemanticAnalyser {
         ASSIGN,
         RETURN,
         VOIDRETURN,
-        CONTINUE,
-        BREAK,
-
+        WHCONTINUE,
+        WHSWBREAK,
         SWSTART,
         SWEND,
         CASESAVE,
         DEFAULT,
-        SWBREAK,
 
     }
 
@@ -884,7 +899,6 @@ public class SemanticAnalyser {
             return symbolTable.getByAddress(address);
         }
     }
-
 
     private void RoutineCall(int first, int second, Instruction.Type type, int[] operands){
         if (getAppropriateSymbol(first).getVarType() != getAppropriateSymbol(second).getVarType()) {

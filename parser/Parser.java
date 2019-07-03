@@ -605,12 +605,11 @@ public class Parser {
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter2) {
             ttt(Token.Type.CONTINUE, thisNode);
-            //sa.executeSemanticRoutine(RoutineType.CONTINUE);
+            sa.executeSemanticRoutine(RoutineType.WHCONTINUE);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter3) {
             ttt(Token.Type.BREAK, thisNode);
-            //sa.executeSemanticRoutine(RoutineType.BREAK);
-            sa.executeSemanticRoutine(RoutineType.SWBREAK);
+            sa.executeSemanticRoutine(RoutineType.WHSWBREAK);
             ttt(Token.Type.SEMICOLON, thisNode);
         }else if(enter4) {
             ttt(Token.Type.SEMICOLON, thisNode);
@@ -642,6 +641,7 @@ public class Parser {
         parNode.addChild(thisNode);
 
         ttt(Token.Type.WHILE, thisNode);
+        sa.executeSemanticRoutine(RoutineType.WHSTART);
         ttt(Token.Type.OPEN_PARENTHESES, thisNode);
         sa.executeSemanticRoutine(RoutineType.WH_LABEL);
         nnn("E", thisNode);
